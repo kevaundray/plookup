@@ -65,113 +65,116 @@ impl MultiSet {
         Polynomial::from_coefficients_vec(domain.ifft(&self.0))
     }
 }
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_sort() {
+        let unsorted_set = MultiSet(vec![
+            Fr::from(50u64),
+            Fr::from(20u64),
+            Fr::from(30u64),
+            Fr::from(40u64),
+        ]);
+        let expected_sorted_multiset = MultiSet(vec![
+            Fr::from(20u64),
+            Fr::from(30u64),
+            Fr::from(40u64),
+            Fr::from(50u64),
+        ]);
 
-#[test]
-fn test_sort() {
-    let unsorted_set = MultiSet(vec![
-        Fr::from(50u64),
-        Fr::from(20u64),
-        Fr::from(30u64),
-        Fr::from(40u64),
-    ]);
-    let expected_sorted_multiset = MultiSet(vec![
-        Fr::from(20u64),
-        Fr::from(30u64),
-        Fr::from(40u64),
-        Fr::from(50u64),
-    ]);
+        let sorted_set = unsorted_set.sort();
+        assert_eq!(sorted_set, expected_sorted_multiset);
+        assert_ne!(sorted_set, unsorted_set);
+    }
 
-    let sorted_set = unsorted_set.sort();
-    assert_eq!(sorted_set, expected_sorted_multiset);
-    assert_ne!(sorted_set, unsorted_set);
-}
+    #[test]
+    fn test_concat() {
+        let mut a = MultiSet::new();
+        a.push(Fr::from(1u64));
+        a.push(Fr::from(2u64));
+        a.push(Fr::from(3u64));
+        let mut b = MultiSet::new();
+        b.push(Fr::from(4u64));
+        b.push(Fr::from(5u64));
+        b.push(Fr::from(6u64));
 
-#[test]
-fn test_concat() {
-    let mut a = MultiSet::new();
-    a.push(Fr::from(1u64));
-    a.push(Fr::from(2u64));
-    a.push(Fr::from(3u64));
-    let mut b = MultiSet::new();
-    b.push(Fr::from(4u64));
-    b.push(Fr::from(5u64));
-    b.push(Fr::from(6u64));
+        let c = a.concatenate(&b);
 
-    let c = a.concatenate(&b);
-
-    let expected_set = MultiSet(vec![
-        Fr::from(1u64),
-        Fr::from(2u64),
-        Fr::from(3u64),
-        Fr::from(4u64),
-        Fr::from(5u64),
-        Fr::from(6u64),
-    ]);
-    assert_eq!(expected_set, c);
-}
-
-#[test]
-fn test_concat_sort() {
-    let mut a = MultiSet::new();
-    a.push(Fr::from(2u64));
-    a.push(Fr::from(2u64));
-    a.push(Fr::from(3u64));
-    a.push(Fr::from(1u64));
-    let mut b = MultiSet::new();
-    b.push(Fr::from(6u64));
-    b.push(Fr::from(4u64));
-    b.push(Fr::from(4u64));
-    b.push(Fr::from(5u64));
-    let c = a.concatenate(&b).sort();
-
-    let expected_set = MultiSet(vec![
-        Fr::from(1u64),
-        Fr::from(2u64),
-        Fr::from(2u64),
-        Fr::from(3u64),
-        Fr::from(4u64),
-        Fr::from(4u64),
-        Fr::from(5u64),
-        Fr::from(6u64),
-    ]);
-    assert_eq!(expected_set, c);
-}
-
-#[test]
-fn test_halve() {
-    let mut a = MultiSet::new();
-    a.push(Fr::from(1u64));
-    a.push(Fr::from(2u64));
-    a.push(Fr::from(3u64));
-    a.push(Fr::from(4u64));
-    a.push(Fr::from(5u64));
-    a.push(Fr::from(6u64));
-    a.push(Fr::from(7u64));
-
-    let (h_1, h_2) = a.halve();
-    assert_eq!(h_1.len(), 4);
-    assert_eq!(h_2.len(), 4);
-
-    assert_eq!(
-        MultiSet(vec![
+        let expected_set = MultiSet(vec![
             Fr::from(1u64),
             Fr::from(2u64),
             Fr::from(3u64),
-            Fr::from(4u64)
-        ]),
-        h_1
-    );
-
-    assert_eq!(
-        MultiSet(vec![
             Fr::from(4u64),
             Fr::from(5u64),
             Fr::from(6u64),
-            Fr::from(7u64)
-        ]),
-        h_2
-    );
+        ]);
+        assert_eq!(expected_set, c);
+    }
 
-    // Last element in the first half should equal first element in the second half
-    assert_eq!(h_1.0.last().unwrap(), &h_2.0[0])
+    #[test]
+    fn test_concat_sort() {
+        let mut a = MultiSet::new();
+        a.push(Fr::from(2u64));
+        a.push(Fr::from(2u64));
+        a.push(Fr::from(3u64));
+        a.push(Fr::from(1u64));
+        let mut b = MultiSet::new();
+        b.push(Fr::from(6u64));
+        b.push(Fr::from(4u64));
+        b.push(Fr::from(4u64));
+        b.push(Fr::from(5u64));
+        let c = a.concatenate(&b).sort();
+
+        let expected_set = MultiSet(vec![
+            Fr::from(1u64),
+            Fr::from(2u64),
+            Fr::from(2u64),
+            Fr::from(3u64),
+            Fr::from(4u64),
+            Fr::from(4u64),
+            Fr::from(5u64),
+            Fr::from(6u64),
+        ]);
+        assert_eq!(expected_set, c);
+    }
+
+    #[test]
+    fn test_halve() {
+        let mut a = MultiSet::new();
+        a.push(Fr::from(1u64));
+        a.push(Fr::from(2u64));
+        a.push(Fr::from(3u64));
+        a.push(Fr::from(4u64));
+        a.push(Fr::from(5u64));
+        a.push(Fr::from(6u64));
+        a.push(Fr::from(7u64));
+
+        let (h_1, h_2) = a.halve();
+        assert_eq!(h_1.len(), 4);
+        assert_eq!(h_2.len(), 4);
+
+        assert_eq!(
+            MultiSet(vec![
+                Fr::from(1u64),
+                Fr::from(2u64),
+                Fr::from(3u64),
+                Fr::from(4u64)
+            ]),
+            h_1
+        );
+
+        assert_eq!(
+            MultiSet(vec![
+                Fr::from(4u64),
+                Fr::from(5u64),
+                Fr::from(6u64),
+                Fr::from(7u64)
+            ]),
+            h_2
+        );
+
+        // Last element in the first half should equal first element in the second half
+        assert_eq!(h_1.0.last().unwrap(), &h_2.0[0])
+    }
 }
