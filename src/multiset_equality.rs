@@ -17,14 +17,14 @@ pub fn compute_h1_h2(f: &MultiSet, t: &MultiSet) -> (MultiSet, MultiSet) {
     (h_1, h_2)
 }
 
-// Computes the i'th term of F(beta, gamma)
+// Computes the i+1'th term of F(beta, gamma)
 fn compute_f_i(i: usize, f: &MultiSet, t: &MultiSet, beta: Fr, gamma: Fr) -> Fr {
     let gamma_beta_one = gamma * (beta + Fr::one());
     // (gamma + f_i) * [gamma *(1 + beta) + t_i + beta * t_{i+1}]
     (gamma + f.0[i]) * (gamma_beta_one + t.0[i] + (beta * t.0[i + 1]))
 }
 
-// Computes the i'th term of F(beta, gamma)
+// Computes the i+1'th term of F(beta, gamma)
 fn compute_g_i(i: usize, h_1: &MultiSet, h_2: &MultiSet, beta: Fr, gamma: Fr) -> Fr {
     let gamma_one_b = gamma * (Fr::one() + beta);
 
