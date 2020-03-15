@@ -36,6 +36,56 @@ fn compute_g_i(i: usize, h_1: &MultiSet, h_2: &MultiSet, beta: Fr, gamma: Fr) ->
     d * e
 }
 
+/// Computes the values for Z(X)
+fn compute_accumulator_values(
+    f: &MultiSet,
+    t: &MultiSet,
+    h_1: &MultiSet,
+    h_2: &MultiSet,
+    beta: Fr,
+    gamma: Fr,
+) -> Vec<Fr> {
+    let n = f.len();
+
+    // F(beta, gamma)
+    let mut numerator: Vec<Fr> = Vec::with_capacity(n + 1);
+    // G(beta, gamma)
+    let mut denominator: Vec<Fr> = Vec::with_capacity(n + 1);
+
+    // Z evaluated at the first root of unity is 1
+    numerator.push(Fr::one());
+    denominator.push(Fr::one());
+
+    let beta_one = Fr::one() + beta;
+
+    // Compute values for Z(X)
+    for i in 0..n {
+        let f_i = beta_one * compute_f_i(i, f, t, beta, gamma);
+        let g_i = compute_g_i(i, h_1, h_2, beta, gamma);
+
+        let last_numerator = *numerator.last().unwrap();
+        let last_denominator = *denominator.last().unwrap();
+
+        numerator.push(f_i * last_numerator);
+        denominator.push(g_i * last_denominator);
+    }
+
+    // Check that Z(g^{n+1}) = 1
+    let last_numerator = *numerator.last().unwrap();
+    let last_denominator = *denominator.last().unwrap();
+
+    assert_eq!(last_numerator / last_denominator, Fr::one());
+
+    // Combine numerator and denominator
+    assert_eq!(numerator.len(), denominator.len());
+    assert_eq!(numerator.len(), n + 1);
+    let mut evaluations = Vec::with_capacity(numerator.len());
+    for (n, d) in numerator.into_iter().zip(denominator) {
+        evaluations.push(n / d)
+    }
+    evaluations
+}
+
 #[test]
 fn test_manually_compute_z() {
     // This test manually computes the values of the accumulator Z(x)
@@ -75,49 +125,57 @@ fn test_manually_compute_z() {
 
     let (h_1, h_2) = compute_h1_h2(&f, &t);
 
-    // (1+\beta)
     let beta_one = Fr::one() + beta;
 
+    // Manually compute the accumulator values
+    //
     // First value of z_0 is 1 / 1
     let z_0_numerator = Fr::one();
     let z_0_denominator = Fr::one();
     let z_0 = z_0_numerator / z_0_denominator;
+    //
     // Next value z_1 is (1+beta)^n * (z_0_numerator * f_0) / (z_0_denominator * g_0)
     let f_0 = compute_f_i(0, &f, &t, beta, gamma);
     let g_0 = compute_g_i(0, &h_1, &h_2, beta, gamma);
     let z_1_numerator = beta_one * z_0_numerator * f_0;
     let z_1_denominator = z_0_denominator * g_0;
     let z_1 = z_1_numerator / z_1_denominator;
+    //
     // Next value z_2 is (1+beta)^n * (z_1_numerator * f_1) / (z_1_denominator * g_1)
     let f_1 = compute_f_i(1, &f, &t, beta, gamma);
     let g_1 = compute_g_i(1, &h_1, &h_2, beta, gamma);
     let z_2_numerator = beta_one * z_1_numerator * f_1;
     let z_2_denominator = z_1_denominator * g_1;
     let z_2 = z_2_numerator / z_2_denominator;
+    //
     // Next value z_3 is (2+beta)^n * (z_2_numerator * f_2) / (z_2_denominator * g_2)
     let f_2 = compute_f_i(2, &f, &t, beta, gamma);
     let g_2 = compute_g_i(2, &h_1, &h_2, beta, gamma);
     let z_3_numerator = beta_one * z_2_numerator * f_2;
     let z_3_denominator = z_2_denominator * g_2;
     let z_3 = z_3_numerator / z_3_denominator;
+    //
     // Next value z_4 is (1+beta)^n * (z_3_numerator * f_3) / (z_3_denominator * g_3)
     let f_3 = compute_f_i(3, &f, &t, beta, gamma);
     let g_3 = compute_g_i(3, &h_1, &h_2, beta, gamma);
     let z_4_numerator = beta_one * z_3_numerator * f_3;
     let z_4_denominator = z_3_denominator * g_3;
     let z_4 = z_4_numerator / z_4_denominator;
+    //
     // Next value z_5 is (1+beta)^n * (z_4_numerator * f_4) / (z_4_denominator * g_4)
     let f_4 = compute_f_i(4, &f, &t, beta, gamma);
     let g_4 = compute_g_i(4, &h_1, &h_2, beta, gamma);
     let z_5_numerator = beta_one * z_4_numerator * f_4;
     let z_5_denominator = z_4_denominator * g_4;
     let z_5 = z_5_numerator / z_5_denominator;
+    //
     // Next value z_6 is (1+beta)^n * (z_5_numerator * f_5) / (z_5_denominator * g_5)
     let f_5 = compute_f_i(5, &f, &t, beta, gamma);
     let g_5 = compute_g_i(5, &h_1, &h_2, beta, gamma);
     let z_6_numerator = beta_one * z_5_numerator * f_5;
     let z_6_denominator = z_5_denominator * g_5;
     let z_6 = z_6_numerator / z_6_denominator;
+    //
     // Last value z_7 is (1+beta)^n * (z_6_numerator * f_6) / (z_6_denominator * g_6)
     // For an honest prover, this should be 1
     let f_6 = compute_f_i(6, &f, &t, beta, gamma);
@@ -127,7 +185,7 @@ fn test_manually_compute_z() {
     let z_7 = z_7_numerator / z_7_denominator;
 
     // Check that the next value in z can be computed using the previously accumulated values multiplied by the next term
-    // ie z_n = z_n-1 * (f_n / g_n)
+    // ie z_{n+1} = z_n * (f_n / g_n)
     // Except for the last element which should be equal to 1
     assert_eq!(z_1, beta_one * z_0 * (f_0 / g_0));
     assert_eq!(z_2, beta_one * z_1 * (f_1 / g_1));
@@ -136,13 +194,21 @@ fn test_manually_compute_z() {
     assert_eq!(z_5, beta_one * z_4 * (f_4 / g_4));
     assert_eq!(z_6, beta_one * z_5 * (f_5 / g_5));
     assert_eq!(z_7, Fr::one());
+
+    // Now check if we get the same values when computed by our function
+    let expected_z_evaluations = vec![z_0, z_1, z_2, z_3, z_4, z_5, z_6, z_7];
+    let z_evaluations = compute_accumulator_values(&f, &t, &h_1, &h_2, beta, gamma);
+    assert_eq!(expected_z_evaluations.len(), z_evaluations.len());
+    for (should_be, got) in expected_z_evaluations.iter().zip(z_evaluations.iter()) {
+        assert_eq!(should_be, got)
+    }
 }
 #[test]
 fn test_h1_h2() {
     // Checks whether h_1 and h_2 are well formed(continuous) in s
     // This is done by checking that the last element of h_1 is the first element of h_2
 
-    let (f, t, _) = setup_test();
+    let (f, t, _) = setup_correct_test();
 
     // Compute h_1(x) and h_2(x) from f and t
     let (h_1, h_2) = compute_h1_h2(&f, &t);
@@ -161,30 +227,30 @@ fn test_h1_h2() {
 }
 
 // This is just a helper function to setup tests with values that work
-fn setup_test() -> (MultiSet, MultiSet, EvaluationDomain<Fr>) {
+fn setup_correct_test() -> (MultiSet, MultiSet, EvaluationDomain<Fr>) {
     // n is the amount of witness values
     // d is the amount of table values
     // We need d = n+1
 
     let mut f = MultiSet::new();
     f.push(Fr::from(1u8));
-    f.push(Fr::from(1u8));
-    f.push(Fr::from(1u8));
-    f.push(Fr::from(1u8));
-    f.push(Fr::from(1u8));
-    f.push(Fr::from(1u8));
-    f.push(Fr::from(1u8));
+    f.push(Fr::from(2u8));
+    f.push(Fr::from(3u8));
+    f.push(Fr::from(4u8));
+    f.push(Fr::from(5u8));
+    f.push(Fr::from(6u8));
+    f.push(Fr::from(7u8));
 
     // Table of values
     let mut t = MultiSet::new();
     t.push(Fr::from(1u8));
     t.push(Fr::from(2u8));
-    t.push(Fr::from(1u8));
-    t.push(Fr::from(1u8));
-    t.push(Fr::from(1u8));
-    t.push(Fr::from(1u8));
-    t.push(Fr::from(1u8));
-    t.push(Fr::from(1u8));
+    t.push(Fr::from(3u8));
+    t.push(Fr::from(4u8));
+    t.push(Fr::from(5u8));
+    t.push(Fr::from(6u8));
+    t.push(Fr::from(7u8));
+    t.push(Fr::from(7u8));
 
     assert_eq!(t.len(), f.len() + 1);
     assert_eq!(t.len().next_power_of_two(), t.len());
