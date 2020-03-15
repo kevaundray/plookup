@@ -1,6 +1,6 @@
 use crate::multiset::MultiSet;
 use algebra::bls12_381::Fr;
-use ff_fft::EvaluationDomain;
+use ff_fft::{DensePolynomial as Polynomial, EvaluationDomain};
 use num_traits::identities::One;
 
 /// Computes the multisets h_1 and h_2
@@ -224,6 +224,82 @@ fn test_h1_h2() {
     let h_2_first = h_2_poly.evaluate(first_element);
 
     assert_eq!(h_1_last, h_2_first);
+}
+
+#[test]
+fn test_term_check() {
+    // Checks whether z_{n+1} = z_n * (f_n / g_n) holds for every value in the domain except for the last element
+    // Then checks that Z(X) evaluated at the last element in the domain is 1
+
+    let (f, t, domain) = setup_correct_test();
+    let f_poly = f.to_polynomial(&domain);
+    let t_poly = t.to_polynomial(&domain);
+
+    let beta = Fr::from(5u8);
+    let gamma = Fr::from(6u8);
+
+    let (h_1, h_2) = compute_h1_h2(&f, &t);
+    let h_1_poly = h_1.to_polynomial(&domain);
+    let h_2_poly = h_2.to_polynomial(&domain);
+
+    let z_evaluations = compute_accumulator_values(&f, &t, &h_1, &h_2, beta, gamma);
+    let z_poly = Polynomial::from_coefficients_vec(domain.ifft(&z_evaluations));
+
+    let beta_one = Fr::one() + beta;
+    let last_element = domain.elements().last().unwrap();
+
+    for (i, element) in domain.elements().enumerate() {
+        // Evaluate polynomials
+        // evaluate z(X)
+        let z_x = z_poly.evaluate(element);
+        // evaluate z(Xg)
+        let z_x_next = z_poly.evaluate(element * domain.group_gen);
+        // evaluate f(X)
+        let f_x = f_poly.evaluate(element);
+        // evaluate t(X)
+        let t_x = t_poly.evaluate(element);
+        // evaluate t(Xg)
+        let t_x_next = t_poly.evaluate(element * domain.group_gen);
+        // evaluate h_1(X)
+        let h_1_x = h_1_poly.evaluate(element);
+        // evaluate h_1(Xg)
+        let h_1_x_next = h_1_poly.evaluate(element * domain.group_gen);
+        // evaluate h_2(X)
+        let h_2_x = h_2_poly.evaluate(element);
+        // evaluate h_2(Xg)
+        let h_2_x_next = h_2_poly.evaluate(element * domain.group_gen);
+
+        // LHS = (x - g^n)[z(x) * (1+b) * (gamma + f(x))] ( gamma(1 + beta) + t(x) + beta * t(Xg))
+
+        // x - g^n
+        let a = element - last_element;
+
+        // z(x) * (1+b) * (gamma + f(x))
+        let b = z_x * beta_one * (gamma + f_x);
+
+        // gamma(1 + beta) + t(x) + beta * t(Xg)
+        let c = (gamma * beta_one) + t_x + (beta * t_x_next);
+
+        let lhs = a * b * c;
+
+        // RHS = z(Xg)(x - g^n) [gamma *(1 + beta) + h_1(X) + beta*h_1(Xg)] [gamma * (1 + beta)] + h_2(X) + (beta * h_2(Xg))
+
+        // z(Xg)(x - g^n)
+        let a = z_x_next * (element - last_element);
+
+        // [gamma *(1 + beta) + h_1(X) + beta*h_1(Xg)]
+        let b = (gamma * beta_one) + h_1_x + (beta * h_1_x_next);
+
+        // [gamma * (1 + beta)] + h_2(X) + (beta * h_2(Xg))
+        let c = (gamma * beta_one) + h_2_x + (beta * h_2_x_next);
+
+        let rhs = a * b * c;
+
+        assert_eq!(lhs, rhs,);
+    }
+
+    // Now check that the last element is equal to 1
+    assert_eq!(z_poly.evaluate(last_element), Fr::one())
 }
 
 // This is just a helper function to setup tests with values that work
