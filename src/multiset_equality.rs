@@ -78,7 +78,7 @@ fn test_manually_compute_z() {
     // (1+\beta)
     let beta_one = Fr::one() + beta;
 
-    // First value of Z is 1 / 1
+    // First value of z_0 is 1 / 1
     let z_0_numerator = Fr::one();
     let z_0_denominator = Fr::one();
     let z_0 = z_0_numerator / z_0_denominator;
@@ -128,12 +128,14 @@ fn test_manually_compute_z() {
 
     // Check that the next value in z can be computed using the previously accumulated values multiplied by the next term
     // ie z_n = z_n-1 * (f_n / g_n)
+    // Except for the last element which should be equal to 1
     assert_eq!(z_1, beta_one * z_0 * (f_0 / g_0));
     assert_eq!(z_2, beta_one * z_1 * (f_1 / g_1));
     assert_eq!(z_3, beta_one * z_2 * (f_2 / g_2));
     assert_eq!(z_4, beta_one * z_3 * (f_3 / g_3));
     assert_eq!(z_5, beta_one * z_4 * (f_4 / g_4));
     assert_eq!(z_6, beta_one * z_5 * (f_5 / g_5));
+    assert_eq!(z_7, Fr::one());
 }
 #[test]
 fn test_h1_h2() {
