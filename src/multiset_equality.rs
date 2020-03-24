@@ -138,49 +138,49 @@ mod test {
         let z_0_denominator = Fr::one();
         let z_0 = z_0_numerator / z_0_denominator;
         //
-        // Next value z_1 is (1+beta)^n * (z_0_numerator * f_0) / (z_0_denominator * g_0)
+        // Next value z_1 is (1+beta) * (z_0_numerator * f_0) / (z_0_denominator * g_0)
         let f_0 = compute_f_i(0, &f, &t, beta, gamma);
         let g_0 = compute_g_i(0, &h_1, &h_2, beta, gamma);
         let z_1_numerator = beta_one * z_0_numerator * f_0;
         let z_1_denominator = z_0_denominator * g_0;
         let z_1 = z_1_numerator / z_1_denominator;
         //
-        // Next value z_2 is (1+beta)^n * (z_1_numerator * f_1) / (z_1_denominator * g_1)
+        // Next value z_2 is (1+beta)^2 * (z_1_numerator * f_1) / (z_1_denominator * g_1)
         let f_1 = compute_f_i(1, &f, &t, beta, gamma);
         let g_1 = compute_g_i(1, &h_1, &h_2, beta, gamma);
         let z_2_numerator = beta_one * z_1_numerator * f_1;
         let z_2_denominator = z_1_denominator * g_1;
         let z_2 = z_2_numerator / z_2_denominator;
         //
-        // Next value z_3 is (2+beta)^n * (z_2_numerator * f_2) / (z_2_denominator * g_2)
+        // Next value z_3 is (1+beta)^3 * (z_2_numerator * f_2) / (z_2_denominator * g_2)
         let f_2 = compute_f_i(2, &f, &t, beta, gamma);
         let g_2 = compute_g_i(2, &h_1, &h_2, beta, gamma);
         let z_3_numerator = beta_one * z_2_numerator * f_2;
         let z_3_denominator = z_2_denominator * g_2;
         let z_3 = z_3_numerator / z_3_denominator;
         //
-        // Next value z_4 is (1+beta)^n * (z_3_numerator * f_3) / (z_3_denominator * g_3)
+        // Next value z_4 is (1+beta)^4 * (z_3_numerator * f_3) / (z_3_denominator * g_3)
         let f_3 = compute_f_i(3, &f, &t, beta, gamma);
         let g_3 = compute_g_i(3, &h_1, &h_2, beta, gamma);
         let z_4_numerator = beta_one * z_3_numerator * f_3;
         let z_4_denominator = z_3_denominator * g_3;
         let z_4 = z_4_numerator / z_4_denominator;
         //
-        // Next value z_5 is (1+beta)^n * (z_4_numerator * f_4) / (z_4_denominator * g_4)
+        // Next value z_5 is (1+beta)^5 * (z_4_numerator * f_4) / (z_4_denominator * g_4)
         let f_4 = compute_f_i(4, &f, &t, beta, gamma);
         let g_4 = compute_g_i(4, &h_1, &h_2, beta, gamma);
         let z_5_numerator = beta_one * z_4_numerator * f_4;
         let z_5_denominator = z_4_denominator * g_4;
         let z_5 = z_5_numerator / z_5_denominator;
         //
-        // Next value z_6 is (1+beta)^n * (z_5_numerator * f_5) / (z_5_denominator * g_5)
+        // Next value z_6 is (1+beta)^6 * (z_5_numerator * f_5) / (z_5_denominator * g_5)
         let f_5 = compute_f_i(5, &f, &t, beta, gamma);
         let g_5 = compute_g_i(5, &h_1, &h_2, beta, gamma);
         let z_6_numerator = beta_one * z_5_numerator * f_5;
         let z_6_denominator = z_5_denominator * g_5;
         let z_6 = z_6_numerator / z_6_denominator;
         //
-        // Last value z_7 is (1+beta)^n * (z_6_numerator * f_6) / (z_6_denominator * g_6)
+        // Last value z_7 is (1+beta)^7 * (z_6_numerator * f_6) / (z_6_denominator * g_6)
         // For an honest prover, this should be 1
         let f_6 = compute_f_i(6, &f, &t, beta, gamma);
         let g_6 = compute_g_i(6, &h_1, &h_2, beta, gamma);
@@ -189,7 +189,7 @@ mod test {
         let z_7 = z_7_numerator / z_7_denominator;
 
         // Check that the next value in z can be computed using the previously accumulated values multiplied by the next term
-        // ie z_{n+1} = z_n * (f_n / g_n)
+        // ie z_{n+1} = (1+beta) * z_n * (f_n / g_n)
         // Except for the last element which should be equal to 1
         assert_eq!(z_1, beta_one * z_0 * (f_0 / g_0));
         assert_eq!(z_2, beta_one * z_1 * (f_1 / g_1));
