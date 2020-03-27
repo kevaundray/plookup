@@ -1,5 +1,6 @@
 use algebra::bls12_381::Fr;
 use ff_fft::{DensePolynomial as Polynomial, EvaluationDomain};
+use std::ops::{Add, Mul};
 
 /// A MultiSet is a variation of a set, where we allow duplicate members
 /// This can be emulated in Rust by using vectors
@@ -15,6 +16,16 @@ impl MultiSet {
     pub fn push(&mut self, value: Fr) {
         self.0.push(value)
     }
+    /// Pushes 'n' elements into the multiset
+    pub fn extend(&mut self, n: usize, value: Fr) {
+        let elements = vec![value; n];
+        self.0.extend(elements);
+    }
+    /// Fetches last element in multiset
+    /// Panics if there are no elementss
+    pub fn last(&self) -> Fr {
+        *self.0.last().unwrap()
+    }
     fn from_slice(slice: &[Fr]) -> MultiSet {
         MultiSet(slice.to_vec())
     }
@@ -22,6 +33,7 @@ impl MultiSet {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
     /// Sorts an multiset in ascending order
     pub fn sort(&self) -> MultiSet {
         let mut cloned = self.0.clone();
@@ -41,6 +53,24 @@ impl MultiSet {
     /// Example : self = [2,1] t = [1,2] returns false
     pub fn sorted_by(&self, _t: &MultiSet) -> bool {
         todo!()
+    }
+    /// Checks whether self is a subset of other
+    pub fn is_subset_of(&self, other: &MultiSet) -> bool {
+        assert!(other.len() >= self.len());
+
+        let mut is_subset = true;
+
+        for x in self.0.iter() {
+            is_subset = other.contains(x);
+            if is_subset == false {
+                break;
+            }
+        }
+        is_subset
+    }
+    /// Checks if an element is in the MultiSet
+    pub fn contains(&self, element: &Fr) -> bool {
+        self.0.contains(element)
     }
     /// Splits a multiset into halves as specified by the paper
     /// If s = [1,2,3,4,5,6,7], we can deduce n using |s| = 2 * n + 1 = 7
@@ -63,6 +93,34 @@ impl MultiSet {
     /// and returns the coefficients as a Polynomial data structure
     pub fn to_polynomial(&self, domain: &EvaluationDomain<Fr>) -> Polynomial<Fr> {
         Polynomial::from_coefficients_vec(domain.ifft(&self.0))
+    }
+}
+
+impl Add for MultiSet {
+    type Output = MultiSet;
+    fn add(self, other: MultiSet) -> Self::Output {
+        let result = self
+            .0
+            .into_iter()
+            .zip(other.0.iter())
+            .map(|(x, y)| x + y)
+            .collect();
+
+        MultiSet(result)
+    }
+}
+impl Mul<Fr> for MultiSet {
+    type Output = MultiSet;
+    fn mul(self, other: Fr) -> Self::Output {
+        let result = self.0.into_iter().map(|x| x * other).collect();
+        MultiSet(result)
+    }
+}
+impl Mul<Fr> for &MultiSet {
+    type Output = MultiSet;
+    fn mul(self, other: Fr) -> Self::Output {
+        let result = self.0.iter().map(|x| other * x).collect();
+        MultiSet(result)
     }
 }
 #[cfg(test)]
@@ -176,5 +234,43 @@ mod test {
 
         // Last element in the first half should equal first element in the second half
         assert_eq!(h_1.0.last().unwrap(), &h_2.0[0])
+    }
+
+    #[test]
+    fn test_to_polynomial() {
+        use ff_fft::EvaluationDomain;
+
+        let mut a = MultiSet::new();
+        a.push(Fr::from(1u8));
+        a.push(Fr::from(2u8));
+        a.push(Fr::from(3u8));
+        a.push(Fr::from(4u8));
+        a.push(Fr::from(5u8));
+        a.push(Fr::from(6u8));
+        a.push(Fr::from(7u8));
+
+        let domain = EvaluationDomain::new(a.len() + 1).unwrap();
+        let a_poly = a.to_polynomial(&domain);
+
+        assert_eq!(a_poly.degree(), 7)
+    }
+    #[test]
+    fn test_is_subset() {
+        let mut a = MultiSet::new();
+        a.push(Fr::from(1u8));
+        a.push(Fr::from(2u8));
+        a.push(Fr::from(3u8));
+        a.push(Fr::from(4u8));
+        a.push(Fr::from(5u8));
+        a.push(Fr::from(6u8));
+        a.push(Fr::from(7u8));
+        let mut b = MultiSet::new();
+        b.push(Fr::from(1u8));
+        b.push(Fr::from(2u8));
+        let mut c = MultiSet::new();
+        c.push(Fr::from(100u8));
+
+        assert!(b.is_subset_of(&a));
+        assert!(!c.is_subset_of(&a));
     }
 }
