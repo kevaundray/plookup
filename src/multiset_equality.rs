@@ -252,7 +252,7 @@ mod test {
         let beta_one = Fr::one() + beta;
         let last_element = domain.elements().last().unwrap();
 
-        for (i, element) in domain.elements().enumerate() {
+        for (_, element) in domain.elements().enumerate() {
             // Evaluate polynomials
             // evaluate z(X)
             let z_x = z_poly.evaluate(element);

@@ -307,7 +307,7 @@ mod test {
         let z_evaluations = compute_accumulator_values(&f, &t, &h_1, &h_2, beta, gamma);
         let z_poly = Polynomial::from_coefficients_vec(domain_2n.ifft(&z_evaluations));
 
-        let (q, remainder) = compute(
+        let (_, remainder) = compute(
             &domain, &z_poly, &f_poly, &t_poly, &h_1_poly, &h_2_poly, beta, gamma,
         );
         // XXX: Last thing to do, the term check validation seems to produce a non-zero remainder.
