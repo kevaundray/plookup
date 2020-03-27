@@ -111,7 +111,10 @@ impl<T: LookUpTable> LookUp<T> {
 
         // Convert witness and table to polynomials
         let f_poly = f.to_polynomial(&domain);
+        let f_commit = kzg10::commit(proving_key, &f_poly);
+
         let t_poly = t.to_polynomial(&domain);
+        let t_commit = kzg10::commit(proving_key, &t_poly);
 
         // Compute h_1 and h_2
         let (h_1, h_2) = multiset_equality::compute_h1_h2(&f, &t);
@@ -149,28 +152,43 @@ impl<T: LookUpTable> LookUp<T> {
         let q_commit = kzg10::commit(proving_key, &quotient_poly);
         transcript.append_commitment(b"quotient_poly", &q_commit);
 
-        // Compute the witness
+        // Compute the witnesses
         //
         let evaluation_challenge = transcript.challenge_scalar(b"evaluation_challenge");
         let evaluation_omega = evaluation_challenge * domain.group_gen;
 
+        // Compute evaluations at `z`
+        let f_eval = f_poly.evaluate(evaluation_challenge);
+        let t_eval = t_poly.evaluate(evaluation_challenge);
         let h_1_eval = h_1_poly.evaluate(evaluation_challenge);
-        let h_1_omega_eval = h_1_poly.evaluate(evaluation_omega);
         let h_2_eval = h_2_poly.evaluate(evaluation_challenge);
-        let h_2_omega_eval = h_2_poly.evaluate(evaluation_omega);
         let z_eval = z_poly.evaluate(evaluation_challenge);
-        let z_omega_eval = z_poly.evaluate(evaluation_omega);
         let q_eval = quotient_poly.evaluate(evaluation_challenge);
 
+        // Compute evaluations at `z * omega`
+        let t_omega_eval = t_poly.evaluate(evaluation_omega);
+        let h_1_omega_eval = h_1_poly.evaluate(evaluation_omega);
+        let h_2_omega_eval = h_2_poly.evaluate(evaluation_omega);
+        let z_omega_eval = z_poly.evaluate(evaluation_omega);
+
+        transcript.append_scalar(b"f_eval", &f_eval);
+        transcript.append_scalar(b"t_eval", &t_eval);
         transcript.append_scalar(b"h_1_eval", &h_1_eval);
-        transcript.append_scalar(b"h_1_omega_eval", &h_1_omega_eval);
         transcript.append_scalar(b"h_2_eval", &h_2_eval);
-        transcript.append_scalar(b"h_2_omega_eval", &h_2_omega_eval);
         transcript.append_scalar(b"z_eval", &z_eval);
-        transcript.append_scalar(b"z_omega_eval", &z_eval);
         transcript.append_scalar(b"q_eval", &q_eval);
+        transcript.append_scalar(b"t_omega_eval", &t_omega_eval);
+        transcript.append_scalar(b"h_1_omega_eval", &h_1_omega_eval);
+        transcript.append_scalar(b"h_2_omega_eval", &h_2_omega_eval);
+        transcript.append_scalar(b"z_omega_eval", &z_eval);
 
         // Compute opening proofs for f(X) evaluated at `z`
+        let f_witness = kzg10::compute_witness(&f_poly, evaluation_challenge);
+        let f_witness_comm = kzg10::commit(proving_key, &f_witness);
+
+        let t_witness = kzg10::compute_witness(&t_poly, evaluation_challenge);
+        let t_witness_comm = kzg10::commit(proving_key, &t_witness);
+
         let h_1_witness = kzg10::compute_witness(&h_1_poly, evaluation_challenge);
         let h_1_witness_comm = kzg10::commit(proving_key, &h_1_witness);
 
@@ -184,6 +202,9 @@ impl<T: LookUpTable> LookUp<T> {
         let q_witness_comm = kzg10::commit(proving_key, &q_witness);
 
         // Compute opening proofs for f(X) evaluated at `z * omega`
+        let t_omega_witness = kzg10::compute_witness(&t_poly, evaluation_omega);
+        let t_omega_witness_comm = kzg10::commit(proving_key, &t_omega_witness);
+
         let h_1_omega_witness = kzg10::compute_witness(&h_1_poly, evaluation_omega);
         let h_1_omega_witness_comm = kzg10::commit(proving_key, &h_1_omega_witness);
 
@@ -194,10 +215,14 @@ impl<T: LookUpTable> LookUp<T> {
         let z_omega_witness_comm = kzg10::commit(proving_key, &z_omega_witness);
 
         MultiSetEqualityProof {
+            n: domain.size(),
+            f_proof: OpeningProof::new((Some(f_commit), f_witness_comm, f_eval)),
+            t_proof: OpeningProof::new((Some(t_commit), t_witness_comm, t_eval)),
             h_1_proof: OpeningProof::new((Some(h_1_commit), h_1_witness_comm, h_1_eval)),
             h_2_proof: OpeningProof::new((Some(h_2_commit), h_2_witness_comm, h_2_eval)),
             z_proof: OpeningProof::new((Some(z_commit), z_witness_comm, z_eval)),
             q_proof: OpeningProof::new((Some(q_commit), q_witness_comm, q_eval)),
+            t_omega_proof: OpeningProof::new((None, t_omega_witness_comm, t_omega_eval)),
             h_1_omega_proof: OpeningProof::new((None, h_1_omega_witness_comm, h_1_omega_eval)),
             h_2_omega_proof: OpeningProof::new((None, h_2_omega_witness_comm, h_2_omega_eval)),
             z_omega_proof: OpeningProof::new((None, z_omega_witness_comm, z_omega_eval)),
