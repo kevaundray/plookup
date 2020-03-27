@@ -2,7 +2,7 @@ use crate::kzg10;
 use crate::lookup_table::LookUpTable;
 use crate::multiset::MultiSet;
 use crate::multiset_equality;
-use crate::proof::Proof;
+use crate::proof::{Evaluations, Proof};
 use crate::quotient_poly;
 use crate::transcript::TranscriptProtocol;
 use algebra::bls12_381::Fr;
@@ -125,8 +125,8 @@ impl<T: LookUpTable> LookUp<T> {
         let h_2_commit = kzg10::commit(proving_key, &h_2_poly);
 
         // Add commitments to transcript
-        transcript.append_commitment(b"h_1", &h_1_commit);
-        transcript.append_commitment(b"h_2", &h_2_commit);
+        transcript.append_commitment(b"h_1_poly", &h_1_commit);
+        transcript.append_commitment(b"h_2_poly", &h_2_commit);
 
         let beta = transcript.challenge_scalar(b"beta");
         let gamma = transcript.challenge_scalar(b"gamma");
@@ -138,6 +138,7 @@ impl<T: LookUpTable> LookUp<T> {
 
         // Commit to Z(X)
         let z_commit = kzg10::commit(proving_key, &z_poly);
+        transcript.append_commitment(b"accumulator_poly", &z_commit);
 
         // Compute quotient polynomial
         let (quotient_poly, _) = quotient_poly::compute(
@@ -146,18 +147,53 @@ impl<T: LookUpTable> LookUp<T> {
 
         // Commit to quotient polynomial
         let q_commit = kzg10::commit(proving_key, &quotient_poly);
+        transcript.append_commitment(b"quotient_poly", &q_commit);
+
+        // Compute the witness
+        //
+        let evaluation_challenge = transcript.challenge_scalar(b"evaluation_challenge");
+
+        let h_1_eval = h_1_poly.evaluate(evaluation_challenge);
+        let h_2_eval = h_2_poly.evaluate(evaluation_challenge);
+        let q_eval = quotient_poly.evaluate(evaluation_challenge);
+        let z_eval = z_poly.evaluate(evaluation_challenge);
+
+        transcript.append_scalar(b"h_1_eval", &h_1_eval);
+        transcript.append_scalar(b"h_2_eval", &h_2_eval);
+        transcript.append_scalar(b"q_eval", &q_eval);
+        transcript.append_scalar(b"z_eval", &z_eval);
+
+        let h_1_witness = kzg10::compute_witness(&h_1_poly, evaluation_challenge);
+        let h_1_witness_comm = kzg10::commit(proving_key, &h_1_witness);
+
+        let h_2_witness = kzg10::compute_witness(&h_2_poly, evaluation_challenge);
+        let h_2_witness_comm = kzg10::commit(proving_key, &h_2_witness);
+
+        let z_witness = kzg10::compute_witness(&z_poly, evaluation_challenge);
+        let z_witness_comm = kzg10::commit(proving_key, &z_witness);
+
+        let q_witness = kzg10::compute_witness(&quotient_poly, evaluation_challenge);
+        let q_witness_comm = kzg10::commit(proving_key, &q_witness);
 
         Proof {
-            // Two commitments to h_1 and h_2
             h_1_comm: h_1_commit,
-            h_2_comm: h_1_commit,
-            // Commitment to Z
+            h_2_comm: h_2_commit,
             z_comm: z_commit,
-            // Commitment to the quotient polynomial
             q_comm: q_commit,
+            evaluations: Evaluations {
+                h_1_eval: h_1_eval,
+                h_2_eval: h_2_eval,
+                z_eval: z_eval,
+                q_eval: q_eval,
+            },
+            h_1_witness_comm: h_1_witness_comm,
+            h_2_witness_comm: h_2_witness_comm,
+            z_witness_comm: z_witness_comm,
+            q_witness_comm: q_witness_comm,
         }
     }
 }
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -227,7 +263,7 @@ mod test {
     fn test_proof() {
         // Setup SRS
         let universal_parameters = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
-        let (proving_key, _) = kzg10::trim(&universal_parameters, 2usize.pow(12));
+        let (proving_key, verifier_key) = kzg10::trim(&universal_parameters, 2usize.pow(12));
 
         // Setup Lookup with a 4 bit table
         let table = XOR4BitTable::new();
@@ -240,8 +276,7 @@ mod test {
         // Adds 3 XOR 5
         lookup.read(&(Fr::from(3u8), Fr::from(5u8)));
 
-        let mut transcript = Transcript::new(b"lookup");
-
-        let proof = lookup.prove(&proving_key, &mut transcript);
+        let mut prover_transcript = Transcript::new(b"lookup");
+        let proof = lookup.prove(&proving_key, &mut prover_transcript);
     }
 }
