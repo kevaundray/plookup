@@ -36,7 +36,7 @@ fn compute_g_i(i: usize, h_1: &MultiSet, h_2: &MultiSet, beta: Fr, gamma: Fr) ->
 }
 
 /// Computes the values for Z(X)
-fn compute_accumulator_values(
+pub fn compute_accumulator_values(
     f: &MultiSet,
     t: &MultiSet,
     h_1: &MultiSet,
