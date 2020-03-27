@@ -6,6 +6,41 @@ _Any misinformation presented here is the sole responsibility of me not understa
 
 The base protocol is a multiset equality argument for showing that a multiset _f_ is contained in _t_.
 
+_Use At Your Own Risk_
+
+## Example 
+
+```rust
+
+// First instantiate a Lookup table. In our case, we have a 4 bit XOR Table
+// However, the paper generalises to any multivariate function.
+let table = XOR4BitTable::new();
+
+// Now pass the table to the Lookup struct which will build the witness accordingly depending on your reads
+let mut lookup = LookUp::new(table);
+
+// Read will first check if (16 XOR 6) is in the 4-bit XOR table
+// If it is, it will fetch the output and add the input and output to the witness
+// A boolean is returned to indicate whether the input combination existed
+// In the below example, since 16 cannot be represented using 4-bits, the witness would not have changed.
+let added = lookup.read(&Fr::from(16), Fr::from(6)));
+
+// Since 8 XOR 10 is available in the 4-bit XOR table
+// 8, 10 and 8 XOR 10 will be added to the witness
+lookup.read((Fr::from(8), Fr::from(10)));
+
+// Alternatively, one can add the witness values directly without checking the table
+// Since there is a check that Z(X) was created correctly. This will fail on the prover side, if the values added are inconsistent with the table.
+lookup.left_wires.push(Fr::from(1000));
+lookup.right_wires.push(Fr::from(889));
+lookup.output_wires.push(Fr::from(1234));
+
+// Once all reads have been made. You can create a proof, that all of the witness values are indeed
+// in the table. We create a random challenge by using a transcript object.
+let mut transcript = Transcript::new(b"lookup");
+let proof = lookup.prove(&proving_key, &mut transcript); 
+
+```
 
 ## How does this integrate into PLONK?
 
@@ -18,3 +53,11 @@ The base protocol is a multiset equality argument for showing that a multiset _f
 - The prover would need to modify the linearisation polynomial to account for the extra terms in the quotient polynomial
 - The prover would need to modify the opening polynomial to include the openings for M(X) and M(Xg)
 - The quotient polynomial Q(x) is extended to check the necessary items in this protocol. It is orthogonal to the custom gates.
+
+
+## Caveats
+
+- The Quotient polynomial is not split into degree-n polynomials, so the SRS is not linear in the number of reads.
+
+## Done Yet
+
