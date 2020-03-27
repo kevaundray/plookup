@@ -58,6 +58,3 @@ let proof = lookup.prove(&proving_key, &mut transcript);
 ## Caveats
 
 - The Quotient polynomial is not split into degree-n polynomials, so the SRS is not linear in the number of reads.
-
-## Done Yet
-
