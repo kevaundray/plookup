@@ -152,17 +152,25 @@ impl<T: LookUpTable> LookUp<T> {
         // Compute the witness
         //
         let evaluation_challenge = transcript.challenge_scalar(b"evaluation_challenge");
+        let evaluation_omega = evaluation_challenge * domain.group_gen;
 
         let h_1_eval = h_1_poly.evaluate(evaluation_challenge);
+        let h_1_omega_eval = h_1_poly.evaluate(evaluation_omega);
         let h_2_eval = h_2_poly.evaluate(evaluation_challenge);
-        let q_eval = quotient_poly.evaluate(evaluation_challenge);
+        let h_2_omega_eval = h_2_poly.evaluate(evaluation_omega);
         let z_eval = z_poly.evaluate(evaluation_challenge);
+        let z_omega_eval = z_poly.evaluate(evaluation_omega);
+        let q_eval = quotient_poly.evaluate(evaluation_challenge);
 
         transcript.append_scalar(b"h_1_eval", &h_1_eval);
+        transcript.append_scalar(b"h_1_omega_eval", &h_1_omega_eval);
         transcript.append_scalar(b"h_2_eval", &h_2_eval);
-        transcript.append_scalar(b"q_eval", &q_eval);
+        transcript.append_scalar(b"h_2_omega_eval", &h_2_omega_eval);
         transcript.append_scalar(b"z_eval", &z_eval);
+        transcript.append_scalar(b"z_omega_eval", &z_eval);
+        transcript.append_scalar(b"q_eval", &q_eval);
 
+        // Compute opening proofs for f(X) evaluated at `z`
         let h_1_witness = kzg10::compute_witness(&h_1_poly, evaluation_challenge);
         let h_1_witness_comm = kzg10::commit(proving_key, &h_1_witness);
 
@@ -175,21 +183,26 @@ impl<T: LookUpTable> LookUp<T> {
         let q_witness = kzg10::compute_witness(&quotient_poly, evaluation_challenge);
         let q_witness_comm = kzg10::commit(proving_key, &q_witness);
 
+        // Compute opening proofs for f(X) evaluated at `z * omega`
+        let h_1_omega_witness = kzg10::compute_witness(&h_1_poly, evaluation_omega);
+        let h_1_omega_witness_comm = kzg10::commit(proving_key, &h_1_omega_witness);
+
+        let h_2_omega_witness = kzg10::compute_witness(&h_2_poly, evaluation_omega);
+        let h_2_omega_witness_comm = kzg10::commit(proving_key, &h_2_omega_witness);
+
+        let z_omega_witness = kzg10::compute_witness(&z_poly, evaluation_omega);
+        let z_omega_witness_comm = kzg10::commit(proving_key, &z_omega_witness);
+
+        use crate::proof::OpeningProof;
+
         Proof {
-            h_1_comm: h_1_commit,
-            h_2_comm: h_2_commit,
-            z_comm: z_commit,
-            q_comm: q_commit,
-            evaluations: Evaluations {
-                h_1_eval: h_1_eval,
-                h_2_eval: h_2_eval,
-                z_eval: z_eval,
-                q_eval: q_eval,
-            },
-            h_1_witness_comm: h_1_witness_comm,
-            h_2_witness_comm: h_2_witness_comm,
-            z_witness_comm: z_witness_comm,
-            q_witness_comm: q_witness_comm,
+            h_1_proof: OpeningProof(Some(h_1_commit), h_1_witness_comm, h_1_eval),
+            h_2_proof: OpeningProof(Some(h_2_commit), h_2_witness_comm, h_2_eval),
+            z_proof: OpeningProof(Some(z_commit), z_witness_comm, z_eval),
+            q_proof: OpeningProof(Some(q_commit), q_witness_comm, q_eval),
+            h_1_omega_proof: OpeningProof(None, h_1_omega_witness_comm, h_1_omega_eval),
+            h_2_omega_proof: OpeningProof(None, h_2_omega_witness_comm, h_2_omega_eval),
+            z_omega_proof: OpeningProof(None, z_omega_witness_comm, z_omega_eval),
         }
     }
 }
