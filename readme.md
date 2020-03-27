@@ -29,8 +29,8 @@ let added = lookup.read(&Fr::from(16), Fr::from(6)));
 // 8, 10 and 8 XOR 10 will be added to the witness
 lookup.read((Fr::from(8), Fr::from(10)));
 
-// Alternatively, one can add the witness values directly without checking the table
-// Since there is a check that Z(X) was created correctly. This will fail on the prover side, if the values added are inconsistent with the table.
+// Alternatively, one can add the witness values directly without checking the table.
+// Since there is a check that Z(X) was created correctly, this will fail on the prover side, if the values added are inconsistent with the table.
 lookup.left_wires.push(Fr::from(1000));
 lookup.right_wires.push(Fr::from(889));
 lookup.output_wires.push(Fr::from(1234));
@@ -57,4 +57,6 @@ let proof = lookup.prove(&proving_key, &mut transcript);
 
 ## Caveats
 
-- The Quotient polynomial is not split into degree-n polynomials, so the SRS is not linear in the number of reads. This can be fixed quite easily in the POC, by doing the same trick that PLONK did.
+- The Quotient polynomial is not split into degree-n polynomials, so the SRS is not linear in the number of reads. This can be fixed quite easily in the POC, by doing the same technique that PLONK did.
+
+- In the protocol, we use a random challenge `alpha` to _fold_ the lookup table into a vector. In an interactive setting, this is fine as `alpha` is random. In a Non-interative setting, this becomes a problem, as the transcript is empty, prior to generating `alpha`. The consequence of this is that one will need to embed this protocol in another protocol, so that you have sufficient entropy to generate alpha.
