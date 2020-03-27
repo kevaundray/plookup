@@ -230,7 +230,7 @@ mod test {
     #[test]
     fn test_proof() {
         // Setup SRS
-        let universal_parameters = kzg10::trusted_setup(2usize.pow(12), &mut rand::thread_rng());
+        let universal_parameters = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
         let (proving_key, _) = kzg10::trim(&universal_parameters, 2usize.pow(12));
 
         // Setup Lookup with a 4 bit table

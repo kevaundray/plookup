@@ -2,13 +2,22 @@ use algebra::bls12_381::Fr;
 use algebra::Bls12_381;
 use ff_fft::DensePolynomial as Polynomial;
 use poly_commit::kzg10::{Commitment, Powers, UniversalParams, VerifierKey, KZG10};
-use rand_core::RngCore;
-
+use rand_chacha::ChaChaRng;
+use rand_core::SeedableRng;
 // Modification of https://github.com/scipr-lab/poly-commit/blob/master/src/kzg10/mod.rs
 type KZG_Bls12_381 = KZG10<Bls12_381>;
 
-pub fn trusted_setup<R: RngCore>(max_deg: usize, rng: &mut R) -> UniversalParams<Bls12_381> {
-    KZG_Bls12_381::setup(max_deg, false, rng).unwrap()
+pub fn trusted_setup(max_deg: usize, seed: &[u8]) -> UniversalParams<Bls12_381> {
+    let mut rng = ChaChaRng::from_seed(to_32_bytes(seed));
+    KZG_Bls12_381::setup(max_deg, false, &mut rng).unwrap()
+}
+
+fn to_32_bytes(bytes: &[u8]) -> [u8; 32] {
+    let mut array: [u8; 32] = [0; 32];
+    for (a, b) in bytes.iter().zip(array.iter_mut()) {
+        *b = *a
+    }
+    array
 }
 
 pub fn trim<'a>(
