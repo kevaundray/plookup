@@ -12,25 +12,29 @@ pub struct Evaluations {
     pub z_eval: Fr,
     pub q_eval: Fr,
 }
+
+// Opening Proof consists of three components:
+// - The commitment to the polynomial, which may be `None` if we have already included the commitment
+// - The Witness for an opening `z`
+// - The result of evaluating the committed polynomial at `z`
+pub struct OpeningProof(
+    pub Option<Commitment<Bls12_381>>,
+    pub Commitment<Bls12_381>,
+    pub Fr,
+);
+
 // This protocol requires 3 extra G1 elements (Commitment)
-// and 4 extra Scalar elements (Evaluations)
+// and 7 extra Scalar elements (Evaluations)
 // - The commitment to the quotient polynomial can be batched with the PLONK quotient polynomial
-// - The Opening Proof can also be batched with the PLONK opening Proof.
-//
-// Also note this is a Proof of Concept, which is why we have a separate proof struct
-// In reality, we will adds these to the PLONK proof data structure
+// - The Witness commitments can also be batched with the PLONK opening Proof.
 pub struct Proof {
-    // Two commitments to h_1 and h_2
-    pub h_1_comm: Commitment<Bls12_381>,
-    pub h_1_witness_comm: Commitment<Bls12_381>,
-    pub h_2_comm: Commitment<Bls12_381>,
-    pub h_2_witness_comm: Commitment<Bls12_381>,
-    // Commitment to Z(X) ; the accumulator polynomial
-    pub z_comm: Commitment<Bls12_381>,
-    pub z_witness_comm: Commitment<Bls12_381>,
-    // Commitment to Q(X); the quotient polynomial
-    pub q_comm: Commitment<Bls12_381>,
-    pub q_witness_comm: Commitment<Bls12_381>,
-    // Commitment to the witness polynomial
-    pub evaluations: Evaluations,
+    // Opening proofs for polynomials evaluated at `z`
+    pub h_1_proof: OpeningProof,
+    pub h_2_proof: OpeningProof,
+    pub z_proof: OpeningProof,
+    pub q_proof: OpeningProof,
+    // Opening proofs for polynomials evaluated at `z * omega`
+    pub h_1_omega_proof: OpeningProof,
+    pub h_2_omega_proof: OpeningProof,
+    pub z_omega_proof: OpeningProof,
 }
