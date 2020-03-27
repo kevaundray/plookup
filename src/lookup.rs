@@ -2,7 +2,7 @@ use crate::kzg10;
 use crate::lookup_table::LookUpTable;
 use crate::multiset::MultiSet;
 use crate::multiset_equality;
-use crate::proof::{Evaluations, Proof};
+use crate::proof::{MultiSetEqualityProof, OpeningProof};
 use crate::quotient_poly;
 use crate::transcript::TranscriptProtocol;
 use algebra::bls12_381::Fr;
@@ -100,7 +100,7 @@ impl<T: LookUpTable> LookUp<T> {
         &self,
         proving_key: &Powers<Bls12_381>,
         transcript: &mut dyn TranscriptProtocol,
-    ) -> Proof {
+    ) -> MultiSetEqualityProof {
         // First we convert the table to a multiset and apply appropriate padding
         let alpha = transcript.challenge_scalar(b"alpha");
         let (f, t) = self.to_multiset(alpha);
@@ -193,16 +193,14 @@ impl<T: LookUpTable> LookUp<T> {
         let z_omega_witness = kzg10::compute_witness(&z_poly, evaluation_omega);
         let z_omega_witness_comm = kzg10::commit(proving_key, &z_omega_witness);
 
-        use crate::proof::OpeningProof;
-
-        Proof {
-            h_1_proof: OpeningProof(Some(h_1_commit), h_1_witness_comm, h_1_eval),
-            h_2_proof: OpeningProof(Some(h_2_commit), h_2_witness_comm, h_2_eval),
-            z_proof: OpeningProof(Some(z_commit), z_witness_comm, z_eval),
-            q_proof: OpeningProof(Some(q_commit), q_witness_comm, q_eval),
-            h_1_omega_proof: OpeningProof(None, h_1_omega_witness_comm, h_1_omega_eval),
-            h_2_omega_proof: OpeningProof(None, h_2_omega_witness_comm, h_2_omega_eval),
-            z_omega_proof: OpeningProof(None, z_omega_witness_comm, z_omega_eval),
+        MultiSetEqualityProof {
+            h_1_proof: OpeningProof::new((Some(h_1_commit), h_1_witness_comm, h_1_eval)),
+            h_2_proof: OpeningProof::new((Some(h_2_commit), h_2_witness_comm, h_2_eval)),
+            z_proof: OpeningProof::new((Some(z_commit), z_witness_comm, z_eval)),
+            q_proof: OpeningProof::new((Some(q_commit), q_witness_comm, q_eval)),
+            h_1_omega_proof: OpeningProof::new((None, h_1_omega_witness_comm, h_1_omega_eval)),
+            h_2_omega_proof: OpeningProof::new((None, h_2_omega_witness_comm, h_2_omega_eval)),
+            z_omega_proof: OpeningProof::new((None, z_omega_witness_comm, z_omega_eval)),
         }
     }
 }
