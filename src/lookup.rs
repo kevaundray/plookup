@@ -1,5 +1,5 @@
 use crate::kzg10;
-use crate::lookup_table::{LookUpTable, XOR4BitTable};
+use crate::lookup_table::LookUpTable;
 use crate::multiset::MultiSet;
 use crate::multiset_equality;
 use crate::proof::Proof;
@@ -68,11 +68,11 @@ impl<T: LookUpTable> LookUp<T> {
     }
 
     /// Aggregates the table and witness values into one multiset
-    /// and pads the witness and or table to be the correct size
-    pub fn to_multiset(&self, challenge: Fr) -> (MultiSet, MultiSet) {
-        let challenge_0 = Fr::from(1u8);
-        let challenge_1 = challenge;
-        let challenge_2 = challenge * challenge;
+    /// sorts, and pads the witness and or table to be the correct size
+    pub fn to_multiset(&self, alpha: Fr) -> (MultiSet, MultiSet) {
+        // Compute challenge alpha^0, alpha^1, alpha^2
+        let one = Fr::from(1u8);
+        let alpha_sq = alpha * alpha;
 
         // First get the witness as multisets
         let left = &self.left_wires;
@@ -82,18 +82,12 @@ impl<T: LookUpTable> LookUp<T> {
         // Now lets get the table values as multisets
         let (t_left, t_right, t_output) = self.table.to_multiset();
 
-        // Now we need to merge our witness values into one multiset
-        let left_challenge = left * challenge_0;
-        let right_challenge = right * challenge_1;
-        let output_challenge = output * challenge_2;
-        let mut merged_witness = left_challenge + right_challenge + output_challenge;
-
-        // Now we need to merge our table values into one multiset
-        let left_challenge = t_left * challenge_0;
-        let right_challenge = t_right * challenge_1;
-        let output_challenge = t_output * challenge_2;
-        let mut merged_table = left_challenge + right_challenge + output_challenge;
-        // Sort merged values
+        // Now we need to aggregate our witness values into one multiset
+        let mut merged_witness = MultiSet::aggregate((left, right, output), (one, alpha, alpha_sq));
+        // Now we need to aggregate our table values into one multiset
+        let mut merged_table =
+            MultiSet::aggregate((&t_left, &t_right, &t_output), (one, alpha, alpha_sq));
+        // Sort merged table values
         merged_table = merged_table.sort();
 
         // Pad values
@@ -108,7 +102,8 @@ impl<T: LookUpTable> LookUp<T> {
         transcript: &mut dyn TranscriptProtocol,
     ) -> Proof {
         // First we convert the table to a multiset and apply appropriate padding
-        let (f, t) = self.to_multiset(transcript.challenge_scalar(b"challenge"));
+        let alpha = transcript.challenge_scalar(b"alpha");
+        let (f, t) = self.to_multiset(alpha);
 
         assert_eq!(f.len() + 1, t.len());
 
@@ -166,6 +161,7 @@ impl<T: LookUpTable> LookUp<T> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::lookup_table::XOR4BitTable;
     use merlin::Transcript;
 
     #[test]
