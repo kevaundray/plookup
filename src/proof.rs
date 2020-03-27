@@ -27,18 +27,35 @@ impl OpeningProof {
     }
 }
 
-// This protocol requires 3 extra G1 elements (Commitment)
-// and 7 extra Scalar elements (Evaluations)
-// - The commitment to the quotient polynomial can be batched with the PLONK quotient polynomial
-// - The Witness commitments can also be batched with the PLONK opening Proof.
+// In the best case, this protocol requires 4 extra G1 elements (Commitment)
+// These are: h_1_commit,h_2_commit, f_commit,t_commit
+//
+// The commitment to the accumulator and the quotient polynomial would ideally be joined into the existing ones in PLONK
+//
+// We would require 7 extra Scalar elements (Evaluations)
+// These are: h_1_eval, h_1_omega_eval, h_2_eval, h_2_omega_eval, f_eval, t_eval, t_omega_eval
+//
+// We would ideally be able to combine the accumulator, Z(X) with the permutation accumulator in plonk, and the quotient polynomial with the quotient polynomial in PLONK
+// Which would save us 2 evaluation points: z_eval and z_omega_eval
+// q_eval which is the quotient evaluation is usually created from the prover messages
+//
+// Lastly, the Witness commitments can also be batched with the PLONK opening Proof.
 pub struct MultiSetEqualityProof {
+    //Size of the domain
+    // XXX: Verifier should have this value
+    pub n: usize,
     // Opening proofs for polynomials evaluated at `z`
     pub h_1_proof: OpeningProof,
     pub h_2_proof: OpeningProof,
     pub z_proof: OpeningProof,
+    pub t_proof: OpeningProof,
+    pub f_proof: OpeningProof,
     pub q_proof: OpeningProof,
     // Opening proofs for polynomials evaluated at `z * omega`
+    pub t_omega_proof: OpeningProof,
     pub h_1_omega_proof: OpeningProof,
     pub h_2_omega_proof: OpeningProof,
     pub z_omega_proof: OpeningProof,
+    // XXX: We include also the evaluations for t since the verifier cannot know pre-prover, what it is.
+    // Surely, we can take advantage of the fact that the verifier has the table in the preprocessing stage?
 }
