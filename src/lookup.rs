@@ -163,63 +163,89 @@ impl<T: LookUpTable> LookUp<T> {
         }
     }
 }
-
-#[test]
-fn test_pad_correct() {
-    let table = XOR4BitTable::new();
-
-    // Setup lookup and add 3 XOR reads into it
-    let mut lookup = LookUp::new(table);
-
-    // Add 1 XOR 2
-    lookup.read(&(Fr::from(2u8), Fr::from(2u8)));
-    // Add 2 XOR 4
-    lookup.read(&(Fr::from(3u8), Fr::from(2u8)));
-    // Add 3 XOR 5
-    lookup.read(&(Fr::from(1u8), Fr::from(2u8)));
-
-    let (f, t) = lookup.to_multiset(Fr::from(5u8));
-    assert_eq!(f.len() + 1, t.len());
-
-    assert!(t.len().is_power_of_two());
-}
-
-#[test]
-fn test_inclusion() {
-    let table = XOR4BitTable::new();
-
-    let mut lookup = LookUp::new(table);
-
-    // Add 2 XOR 2
-    lookup.read(&(Fr::from(2u8), Fr::from(2u8)));
-    // Add 1 XOR 2
-    lookup.read(&(Fr::from(1u8), Fr::from(2u8)));
-    // Add 3 XOR 5
-    lookup.read(&(Fr::from(1u8), Fr::from(2u8)));
-
-    let (f, t) = lookup.to_multiset(Fr::from(5u8));
-    assert!(f.is_subset_of(&t));
-}
-#[test]
-fn test_proof() {
-    // Setup SRS
-    let universal_parameters = kzg10::trusted_setup(2usize.pow(12), &mut rand::thread_rng());
-    let (proving_key, _) = kzg10::trim(&universal_parameters, 2usize.pow(12));
-
-    // Setup lookup and add 3 XOR reads into it
-    let table = XOR4BitTable::new();
-
-    let mut lookup = LookUp::new(table);
-
-    // Adds 1 XOR 2
-    lookup.read(&(Fr::from(1u8), Fr::from(2u8)));
-    // Adds 2 XOR 4
-    lookup.read(&(Fr::from(100u8), Fr::from(3u8)));
-    // Adds 3 XOR 5
-    lookup.read(&(Fr::from(3u8), Fr::from(1u8)));
-
+#[cfg(test)]
+mod test {
+    use super::*;
     use merlin::Transcript;
-    let mut transcript = Transcript::new(b"lookup");
 
-    let proof = lookup.prove(&proving_key, &mut transcript);
+    #[test]
+    fn test_pad_correct() {
+        let table = XOR4BitTable::new();
+
+        // Setup lookup and add 3 XOR reads into it
+        let mut lookup = LookUp::new(table);
+
+        // Add 1 XOR 2
+        lookup.read(&(Fr::from(2u8), Fr::from(2u8)));
+        // Add 2 XOR 4
+        lookup.read(&(Fr::from(3u8), Fr::from(2u8)));
+        // Add 3 XOR 5
+        lookup.read(&(Fr::from(1u8), Fr::from(2u8)));
+
+        let (f, t) = lookup.to_multiset(Fr::from(5u8));
+        assert_eq!(f.len() + 1, t.len());
+
+        assert!(t.len().is_power_of_two());
+    }
+
+    #[test]
+    fn test_inclusion() {
+        let table = XOR4BitTable::new();
+
+        let mut lookup = LookUp::new(table);
+
+        // Add 2 XOR 2
+        lookup.read(&(Fr::from(2u8), Fr::from(2u8)));
+        // Add 1 XOR 2
+        lookup.read(&(Fr::from(1u8), Fr::from(2u8)));
+        // Add 3 XOR 5
+        lookup.read(&(Fr::from(1u8), Fr::from(2u8)));
+        let (f, t) = lookup.to_multiset(Fr::from(5u8));
+        assert!(f.is_subset_of(&t));
+    }
+    #[test]
+    fn test_len() {
+        // Check that the correct values are being added to the witness
+        // If the value is not in the XOR4BitTable, it is not added to the witness
+        // For a 4-bit XOR table the range is [0,15]
+
+        let table = XOR4BitTable::new();
+        let mut lookup = LookUp::new(table);
+
+        let added = lookup.read(&(Fr::from(16u8), Fr::from(6u8)));
+        assert!(!added);
+
+        let added = lookup.read(&(Fr::from(8u8), Fr::from(17u8)));
+        assert!(!added);
+        let added = lookup.read(&(Fr::from(15u8), Fr::from(13u8)));
+        assert!(added);
+
+        assert_eq!(lookup.left_wires.len(), 1);
+        assert_eq!(lookup.right_wires.len(), 1);
+        assert_eq!(lookup.output_wires.len(), 1);
+
+        let (f, t) = lookup.to_multiset(Fr::from(5u8));
+        assert!(f.is_subset_of(&t));
+    }
+    #[test]
+    fn test_proof() {
+        // Setup SRS
+        let universal_parameters = kzg10::trusted_setup(2usize.pow(12), &mut rand::thread_rng());
+        let (proving_key, _) = kzg10::trim(&universal_parameters, 2usize.pow(12));
+
+        // Setup Lookup with a 4 bit table
+        let table = XOR4BitTable::new();
+        let mut lookup = LookUp::new(table);
+
+        // Adds 1 XOR 2
+        lookup.read(&(Fr::from(1u8), Fr::from(2u8)));
+        // Adds 2 XOR 4
+        lookup.read(&(Fr::from(2u8), Fr::from(4u8)));
+        // Adds 3 XOR 5
+        lookup.read(&(Fr::from(3u8), Fr::from(5u8)));
+
+        let mut transcript = Transcript::new(b"lookup");
+
+        let proof = lookup.prove(&proving_key, &mut transcript);
+    }
 }
