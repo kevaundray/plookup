@@ -59,7 +59,7 @@ let proof = lookup.prove(&proving_key, &mut transcript);
 
 - The Quotient polynomial is not split into degree-n polynomials, so the SRS is not linear in the number of reads. This can be fixed quite easily in the POC, by doing the same technique that PLONK did.
 
-- In the protocol, we use a random challenge `alpha` to _fold_ the lookup table into a vector. In an interactive setting, this is fine as `alpha` is random. In a Non-interative setting, this becomes a problem, as the transcript is empty, prior to generating `alpha`. The consequence of this is that one will need to embed this protocol in another protocol, so that you have sufficient entropy to generate alpha.
+- In the protocol, we use a random challenge `alpha` to _fold_ the lookup table into a multiset. In an interactive setting, this is fine as `alpha` is random. In a Non-interative setting, this becomes a problem, as the transcript is empty, prior to generating `alpha`. The consequence of this is that one will need to embed this protocol in another protocol, so that you have sufficient entropy to generate alpha.
 
 - This POC does not aggregate the witness. We will therefore have a witness per commitment, in reality, we will have one witness for all polynomials, since they are all evaluated at the same point. This was done for easier debugging. 
 
