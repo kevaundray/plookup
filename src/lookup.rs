@@ -314,5 +314,8 @@ mod test {
 
         let mut prover_transcript = Transcript::new(b"lookup");
         let proof = lookup.prove(&proving_key, &mut prover_transcript);
+
+        let mut verifier_transcript = Transcript::new(b"lookup");
+        proof.verify(&verifier_key, &mut verifier_transcript);
     }
 }
