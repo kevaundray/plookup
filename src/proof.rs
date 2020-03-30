@@ -1,30 +1,34 @@
 use crate::kzg10;
-use crate::lookup_table::{LookUpTable, XOR4BitTable};
-use crate::multiset;
 use crate::transcript::TranscriptProtocol;
 use algebra::bls12_381::Fr;
 use algebra::Bls12_381;
 use ff_fft::EvaluationDomain;
 use poly_commit::kzg10::Commitment;
 use poly_commit::kzg10::VerifierKey;
-// Opening Proof consists of three components:
-// - The commitment to the polynomial, which may be `None` if we have already included the commitment
-// - The Witness for an opening `z`
-// - The result of evaluating the committed polynomial at `z`
-pub struct OpeningProof {
-    pub poly_commitment: Option<Commitment<Bls12_381>>,
-    pub witness_commitment: Commitment<Bls12_381>,
-    pub evaluation: Fr,
-}
 
-impl OpeningProof {
-    pub fn new(proof: (Option<Commitment<Bls12_381>>, Commitment<Bls12_381>, Fr)) -> OpeningProof {
-        OpeningProof {
-            poly_commitment: proof.0,
-            witness_commitment: proof.1,
-            evaluation: proof.2,
-        }
-    }
+// Evaluations store the evaluations of different polynomial.
+// `t` denotes that the polynomial was evaluated at t(z) for some random evaluation challenge `z`
+// `t_omega` denotes the polynomial was evaluated at t(z * omega) where omega is the group generator
+// In the FFT context, the normal terminology is that t(z*omega) means to evaluate a polynomial at the next root of unity from `z`.
+pub struct Evaluations {
+    pub f: Fr,
+    pub t: Fr,
+    pub t_omega: Fr,
+    pub h_1: Fr,
+    pub h_1_omega: Fr,
+    pub h_2: Fr,
+    pub h_2_omega: Fr,
+    pub z: Fr,
+    pub z_omega: Fr,
+}
+// Commitments of different polynomials
+pub struct Commitments {
+    pub f: Commitment<Bls12_381>,
+    pub q: Commitment<Bls12_381>,
+    pub t: Commitment<Bls12_381>,
+    pub h_1: Commitment<Bls12_381>,
+    pub h_2: Commitment<Bls12_381>,
+    pub z: Commitment<Bls12_381>,
 }
 
 // In the best case, this protocol requires 4 extra G1 elements (Commitment)
@@ -44,18 +48,13 @@ pub struct MultiSetEqualityProof {
     //Size of the domain
     // XXX: Verifier should have this value
     pub n: usize,
-    // Opening proofs for polynomials evaluated at `z`
-    pub h_1_proof: OpeningProof,
-    pub h_2_proof: OpeningProof,
-    pub z_proof: OpeningProof,
-    pub t_proof: OpeningProof,
-    pub f_proof: OpeningProof,
-    pub q_proof: OpeningProof,
-    // Opening proofs for polynomials evaluated at `z * omega`
-    pub t_omega_proof: OpeningProof,
-    pub h_1_omega_proof: OpeningProof,
-    pub h_2_omega_proof: OpeningProof,
-    pub z_omega_proof: OpeningProof,
+
+    pub aggregate_witness_comm: Commitment<Bls12_381>,
+    pub shifted_aggregate_witness_comm: Commitment<Bls12_381>,
+
+    pub evaluations: Evaluations,
+
+    pub commitments: Commitments,
     // XXX: We include also the evaluations for t since the verifier cannot know pre-prover, what it is.
     // Surely, we can take advantage of the fact that the verifier has the table in the preprocessing stage? Yes. The paper states this, so will need to figure this out
 }
@@ -69,127 +68,95 @@ impl MultiSetEqualityProof {
     ) -> bool {
         let domain: EvaluationDomain<Fr> = EvaluationDomain::new(self.n).unwrap();
 
-        // Generate alpha and fold the table using alpha
         let alpha = transcript.challenge_scalar(b"alpha");
+        transcript.append_scalar(b"alpha", &alpha);
 
-        transcript.append_commitment(b"h_1_poly", &self.h_1_proof.poly_commitment.unwrap());
-        transcript.append_commitment(b"h_2_poly", &self.h_2_proof.poly_commitment.unwrap());
+        transcript.append_commitment(b"h_1_poly", &self.commitments.h_1);
+        transcript.append_commitment(b"h_2_poly", &self.commitments.h_2);
 
         let beta = transcript.challenge_scalar(b"beta");
         let gamma = transcript.challenge_scalar(b"gamma");
-        transcript.append_commitment(b"accumulator_poly", &self.z_proof.poly_commitment.unwrap());
-        transcript.append_commitment(b"quotient_poly", &self.q_proof.poly_commitment.unwrap());
+        transcript.append_commitment(b"accumulator_poly", &self.commitments.z);
+        transcript.append_commitment(b"quotient_poly", &self.commitments.q);
 
         let evaluation_challenge = transcript.challenge_scalar(b"evaluation_challenge");
         let evaluation_omega = evaluation_challenge * domain.group_gen;
-
-        transcript.append_scalar(b"f_eval", &self.f_proof.evaluation);
-        transcript.append_scalar(b"t_eval", &self.t_proof.evaluation);
-        transcript.append_scalar(b"h_1_eval", &self.h_1_proof.evaluation);
-        transcript.append_scalar(b"h_2_eval", &self.h_2_proof.evaluation);
-        transcript.append_scalar(b"z_eval", &self.z_proof.evaluation);
-        transcript.append_scalar(b"q_eval", &self.q_proof.evaluation);
-        transcript.append_scalar(b"t_omega_eval", &self.t_omega_proof.evaluation);
-        transcript.append_scalar(b"h_1_omega_eval", &self.h_1_omega_proof.evaluation);
-        transcript.append_scalar(b"h_2_omega_eval", &self.h_2_omega_proof.evaluation);
-        transcript.append_scalar(b"z_omega_eval", &self.z_omega_proof.evaluation);
-
-        // Check each commitment individually -- XXX: Can aggregate all of these into one using an aggregation challenge
-        // h_1(X)
-        let ok = kzg10::verify(
-            &verification_key,
-            &self.h_1_proof.poly_commitment.unwrap(),
-            &self.h_1_proof.witness_commitment,
-            evaluation_challenge,
-            self.h_1_proof.evaluation,
-        );
-        assert!(ok);
-        let ok = kzg10::verify(
-            &verification_key,
-            &self.h_1_proof.poly_commitment.unwrap(),
-            &self.h_1_omega_proof.witness_commitment,
-            evaluation_omega,
-            self.h_1_omega_proof.evaluation,
-        );
-        assert!(ok);
-
-        // h_2(X)
-        let ok = kzg10::verify(
-            &verification_key,
-            &self.h_2_proof.poly_commitment.unwrap(),
-            &self.h_2_proof.witness_commitment,
-            evaluation_challenge,
-            self.h_2_proof.evaluation,
-        );
-        assert!(ok);
-        let ok = kzg10::verify(
-            &verification_key,
-            &self.h_2_proof.poly_commitment.unwrap(),
-            &self.h_2_omega_proof.witness_commitment,
-            evaluation_omega,
-            self.h_2_omega_proof.evaluation,
-        );
-        assert!(ok);
-
-        // Z(X)
-        let ok = kzg10::verify(
-            &verification_key,
-            &self.z_proof.poly_commitment.unwrap(),
-            &self.z_proof.witness_commitment,
-            evaluation_challenge,
-            self.z_proof.evaluation,
-        );
-        assert!(ok);
-        let ok = kzg10::verify(
-            &verification_key,
-            &self.z_proof.poly_commitment.unwrap(),
-            &self.z_omega_proof.witness_commitment,
-            evaluation_omega,
-            self.z_omega_proof.evaluation,
-        );
-        assert!(ok);
-
-        // t(X)
-        let ok = kzg10::verify(
-            &verification_key,
-            &self.t_proof.poly_commitment.unwrap(),
-            &self.t_proof.witness_commitment,
-            evaluation_challenge,
-            self.t_proof.evaluation,
-        );
-        assert!(ok);
-        let ok = kzg10::verify(
-            &verification_key,
-            &self.t_proof.poly_commitment.unwrap(),
-            &self.t_omega_proof.witness_commitment,
-            evaluation_omega,
-            self.t_omega_proof.evaluation,
-        );
-        assert!(ok);
-
-        // f(X)
-        let ok = kzg10::verify(
-            &verification_key,
-            &self.f_proof.poly_commitment.unwrap(),
-            &self.f_proof.witness_commitment,
-            evaluation_challenge,
-            self.f_proof.evaluation,
-        );
-        assert!(ok);
-
-        // Q(X)
-        // Compute quotient evaluation from the provers messages
-        let expected_q =
+        // Compute quotient evaluation (Q(z)) from the provers messages
+        let q_eval =
             self.compute_quotient_evaluation(&beta, &gamma, &evaluation_challenge, &domain);
 
-        assert_eq!(expected_q, self.q_proof.evaluation);
+        transcript.append_scalar(b"f_eval", &self.evaluations.f);
+        transcript.append_scalar(b"t_eval", &self.evaluations.t);
+        transcript.append_scalar(b"h_1_eval", &self.evaluations.h_1);
+        transcript.append_scalar(b"h_2_eval", &self.evaluations.h_2);
+        transcript.append_scalar(b"z_eval", &self.evaluations.z);
+        transcript.append_scalar(b"q_eval", &q_eval);
+        transcript.append_scalar(b"t_omega_eval", &self.evaluations.t_omega);
+        transcript.append_scalar(b"h_1_omega_eval", &self.evaluations.h_1_omega);
+        transcript.append_scalar(b"h_2_omega_eval", &self.evaluations.h_2_omega);
+        transcript.append_scalar(b"z_omega_eval", &self.evaluations.z_omega);
+
+        let aggregation_challenge = transcript.challenge_scalar(b"witness_aggregation");
+
+        // Check each commitment individually -- XXX: Can aggregate all of these into one using an aggregation challenge
+
+        let agg_commitment = kzg10::aggregate_commitments(
+            vec![
+                &self.commitments.f,
+                &self.commitments.t,
+                &self.commitments.h_1,
+                &self.commitments.h_2,
+                &self.commitments.z,
+                &self.commitments.q,
+            ],
+            aggregation_challenge,
+        );
+        let agg_value = kzg10::aggregate_values(
+            vec![
+                &self.evaluations.f,
+                &self.evaluations.t,
+                &self.evaluations.h_1,
+                &self.evaluations.h_2,
+                &self.evaluations.z,
+                &q_eval,
+            ],
+            aggregation_challenge,
+        );
 
         let ok = kzg10::verify(
             &verification_key,
-            &self.q_proof.poly_commitment.unwrap(),
-            &self.q_proof.witness_commitment,
+            &agg_commitment,
+            &self.aggregate_witness_comm,
             evaluation_challenge,
-            expected_q,
+            agg_value,
+        );
+        assert!(ok);
+
+        let shifted_agg_commitment = kzg10::aggregate_commitments(
+            vec![
+                &self.commitments.t,
+                &self.commitments.h_1,
+                &self.commitments.h_2,
+                &self.commitments.z,
+            ],
+            aggregation_challenge,
+        );
+        let shifted_agg_value = kzg10::aggregate_values(
+            vec![
+                &self.evaluations.t_omega,
+                &self.evaluations.h_1_omega,
+                &self.evaluations.h_2_omega,
+                &self.evaluations.z_omega,
+            ],
+            aggregation_challenge,
+        );
+
+        let ok = kzg10::verify(
+            &verification_key,
+            &shifted_agg_commitment,
+            &self.shifted_aggregate_witness_comm,
+            evaluation_omega,
+            shifted_agg_value,
         );
         assert!(ok);
 
@@ -219,36 +186,31 @@ impl MultiSetEqualityProof {
         let gamma_beta_one = (Fr::from(1u8) + beta) * gamma;
 
         // L_1(X) [ Z(X) -1]
-        let a = { (self.z_proof.evaluation - Fr::from(1u8)) * l1_z };
+        let a = { (self.evaluations.z - Fr::from(1u8)) * l1_z };
 
         // x-g^{n+1} * Z(X)(1+beta) * (gamma + f(x)) (gamma(1+beta) + t(x) + beta * t(Xg))
         let b = {
             let b_0 = *evaluation_challenge - last_element;
-            let b_1 = self.z_proof.evaluation * beta_one;
-            let b_2 = self.f_proof.evaluation + gamma;
-            let b_3 =
-                gamma_beta_one + self.t_proof.evaluation + (self.t_omega_proof.evaluation * beta);
+            let b_1 = self.evaluations.z * beta_one;
+            let b_2 = self.evaluations.f + gamma;
+            let b_3 = gamma_beta_one + self.evaluations.t + (self.evaluations.t_omega * beta);
             b_0 * b_1 * b_2 * b_3
         };
         // x-g^{n+1} * Z(Xg)[(gamma(1+beta) + h_1(X) + beta * h_1(Xg)][(gamma(1+beta) + h_2(X) + beta * h_2(Xg)]
         let c = {
-            let c_0 = (*evaluation_challenge - last_element) * self.z_omega_proof.evaluation;
+            let c_0 = (*evaluation_challenge - last_element) * self.evaluations.z_omega;
 
-            let c_1 = gamma_beta_one
-                + self.h_1_proof.evaluation
-                + (self.h_1_omega_proof.evaluation * beta);
+            let c_1 = gamma_beta_one + self.evaluations.h_1 + (self.evaluations.h_1_omega * beta);
 
-            let c_2 = gamma_beta_one
-                + self.h_2_proof.evaluation
-                + (self.h_2_omega_proof.evaluation * beta);
+            let c_2 = gamma_beta_one + self.evaluations.h_2 + (self.evaluations.h_2_omega * beta);
 
             c_0 * c_1 * c_2
         };
 
         // L_{n+1}(X)[h_1(X) - h_2(Xg)]
-        let d = ln_plus_1_z * (self.h_1_proof.evaluation - self.h_2_omega_proof.evaluation);
+        let d = ln_plus_1_z * (self.evaluations.h_1 - self.evaluations.h_2_omega);
         // L_{n+1}(X)[Z(X) - 1]
-        let e = (self.z_proof.evaluation - Fr::from(1u8)) * ln_plus_1_z;
+        let e = (self.evaluations.z - Fr::from(1u8)) * ln_plus_1_z;
 
         (a + b - c + d + e) / v_h
     }

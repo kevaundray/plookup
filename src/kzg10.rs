@@ -1,6 +1,8 @@
-use algebra::bls12_381::Fr;
+use algebra::bls12_381::{Fr, G1Projective};
 use algebra::Bls12_381;
+use algebra_core::curves::AffineCurve;
 use ff_fft::DensePolynomial as Polynomial;
+use num_traits::identities::Zero;
 use poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, VerifierKey, KZG10};
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
@@ -57,10 +59,56 @@ pub fn commit(powers: &Powers<Bls12_381>, p: &Polynomial<Fr>) -> Commitment<Bls1
 // So we can compute the witness as f(x) / x-z
 pub fn compute_witness(polynomial: &Polynomial<Fr>, point: Fr) -> Polynomial<Fr> {
     let divisor = Polynomial::from_coefficients_vec(vec![-point, Fr::from(1u8)]);
-
     polynomial / &divisor
 }
+// For some challenge v, a list of polynomials p_i and a point z
+// We compute the aggregate witness as (v^0 * p_0 + v^1 * p_1 + ...+ v^n * p_n ) / x-z
+pub fn compute_aggregate_witness(
+    polynomials: Vec<&Polynomial<Fr>>,
+    point: Fr,
+    aggregation_challenge: Fr,
+) -> Polynomial<Fr> {
+    let mut powers = Fr::from(1u8);
+    let mut result = Polynomial::zero();
 
+    for polynomial in polynomials {
+        let intermediate_poly = polynomial * &Polynomial::from_coefficients_vec(vec![powers]);
+        result += &intermediate_poly;
+        powers = powers * aggregation_challenge;
+    }
+
+    let divisor = Polynomial::from_coefficients_vec(vec![-point, Fr::from(1u8)]);
+
+    &result / &divisor
+}
+
+pub fn aggregate_commitments(
+    commitments: Vec<&Commitment<Bls12_381>>,
+    aggregation_challenge: Fr,
+) -> Commitment<Bls12_381> {
+    let mut powers = Fr::from(1u8);
+    let mut result = G1Projective::zero();
+
+    for commitment in commitments {
+        let intermediate_comm = commitment.0.mul(powers);
+        result += &intermediate_comm;
+        powers = powers * aggregation_challenge;
+    }
+
+    Commitment(result.into())
+}
+pub fn aggregate_values(values: Vec<&Fr>, aggregation_challenge: Fr) -> Fr {
+    let mut powers = Fr::from(1u8);
+    let mut result = Fr::zero();
+
+    for value in values {
+        let intermediate_value = *value * powers;
+        result += &intermediate_value;
+        powers = powers * aggregation_challenge;
+    }
+
+    result
+}
 pub fn verify(
     vk: &VerifierKey<Bls12_381>,
     commitment_to_poly: &Commitment<Bls12_381>,
