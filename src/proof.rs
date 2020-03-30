@@ -60,7 +60,6 @@ pub struct MultiSetEqualityProof {
 }
 
 impl MultiSetEqualityProof {
-    // XXX: For debugging purposes, verify either returns true or it panics. Will remove this once we aggregate all commitments
     pub fn verify(
         &self,
         verification_key: &VerifierKey<Bls12_381>,
@@ -70,17 +69,16 @@ impl MultiSetEqualityProof {
 
         let alpha = transcript.challenge_scalar(b"alpha");
         transcript.append_scalar(b"alpha", &alpha);
-
         transcript.append_commitment(b"h_1_poly", &self.commitments.h_1);
         transcript.append_commitment(b"h_2_poly", &self.commitments.h_2);
-
         let beta = transcript.challenge_scalar(b"beta");
         let gamma = transcript.challenge_scalar(b"gamma");
         transcript.append_commitment(b"accumulator_poly", &self.commitments.z);
         transcript.append_commitment(b"quotient_poly", &self.commitments.q);
-
         let evaluation_challenge = transcript.challenge_scalar(b"evaluation_challenge");
+        transcript.append_scalar(b"evaluation_challenge", &evaluation_challenge);
         let evaluation_omega = evaluation_challenge * domain.group_gen;
+
         // Compute quotient evaluation (Q(z)) from the provers messages
         let q_eval =
             self.compute_quotient_evaluation(&beta, &gamma, &evaluation_challenge, &domain);
@@ -98,8 +96,7 @@ impl MultiSetEqualityProof {
 
         let aggregation_challenge = transcript.challenge_scalar(b"witness_aggregation");
 
-        // Check each commitment individually -- XXX: Can aggregate all of these into one using an aggregation challenge
-
+        // Create aggregate opening proof for all polynomials evaluated at the evaluation challenge `z`
         let agg_commitment = kzg10::aggregate_commitments(
             vec![
                 &self.commitments.f,
@@ -123,15 +120,7 @@ impl MultiSetEqualityProof {
             aggregation_challenge,
         );
 
-        let ok = kzg10::verify(
-            &verification_key,
-            &agg_commitment,
-            &self.aggregate_witness_comm,
-            evaluation_challenge,
-            agg_value,
-        );
-        assert!(ok);
-
+        // Create aggregate opening proof for all polynomials evaluated at the shifted evaluation challenge `z * omega`
         let shifted_agg_commitment = kzg10::aggregate_commitments(
             vec![
                 &self.commitments.t,
@@ -151,14 +140,17 @@ impl MultiSetEqualityProof {
             aggregation_challenge,
         );
 
-        let ok = kzg10::verify(
+        // Batch Verify both opening proofs
+        let ok = kzg10::batch_verify(
             &verification_key,
-            &shifted_agg_commitment,
-            &self.shifted_aggregate_witness_comm,
-            evaluation_omega,
-            shifted_agg_value,
+            vec![agg_commitment, shifted_agg_commitment],
+            vec![
+                self.aggregate_witness_comm,
+                self.shifted_aggregate_witness_comm,
+            ],
+            vec![evaluation_challenge, evaluation_omega],
+            vec![agg_value, shifted_agg_value],
         );
-        assert!(ok);
 
         ok
     }

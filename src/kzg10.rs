@@ -123,3 +123,30 @@ pub fn verify(
 
     KZG10::check(vk, commitment_to_poly, evaluation_point, value, &proof).unwrap()
 }
+
+pub fn batch_verify(
+    vk: &VerifierKey<Bls12_381>,
+    commitment_to_polynomials: Vec<Commitment<Bls12_381>>,
+    commitment_to_witnesses: Vec<Commitment<Bls12_381>>,
+    evaluation_points: Vec<Fr>,
+    values: Vec<Fr>,
+) -> bool {
+    let mut proofs: Vec<Proof<Bls12_381>> = Vec::new();
+    for witness in commitment_to_witnesses {
+        let proof = Proof {
+            w: witness.0,
+            random_v: Fr::zero(),
+        };
+        proofs.push(proof);
+    }
+
+    KZG10::batch_check(
+        vk,
+        commitment_to_polynomials.as_slice(),
+        &evaluation_points,
+        &values,
+        &proofs,
+        &mut rand::thread_rng(),
+    )
+    .unwrap()
+}

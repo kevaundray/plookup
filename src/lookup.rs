@@ -155,9 +155,10 @@ impl<T: LookUpTable> LookUp<T> {
         let q_commit = kzg10::commit(proving_key, &quotient_poly);
         transcript.append_commitment(b"quotient_poly", &q_commit);
 
-        // Compute the witnesses
+        // Compute the Witness that f was a subset of t
         //
         let evaluation_challenge = transcript.challenge_scalar(b"evaluation_challenge");
+        transcript.append_scalar(b"evaluation_challenge", &evaluation_challenge);
         let evaluation_omega = evaluation_challenge * domain.group_gen;
 
         // Compute evaluations at `z`
