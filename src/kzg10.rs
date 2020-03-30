@@ -7,11 +7,11 @@ use poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, VerifierKey
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 // Modification of https://github.com/scipr-lab/poly-commit/blob/master/src/kzg10/mod.rs
-type KZG_Bls12_381 = KZG10<Bls12_381>;
+type KzgBls12_381 = KZG10<Bls12_381>;
 
 pub fn trusted_setup(max_deg: usize, seed: &[u8]) -> UniversalParams<Bls12_381> {
     let mut rng = ChaChaRng::from_seed(to_32_bytes(seed));
-    KZG_Bls12_381::setup(max_deg, false, &mut rng).unwrap()
+    KzgBls12_381::setup(max_deg, false, &mut rng).unwrap()
 }
 
 fn to_32_bytes(bytes: &[u8]) -> [u8; 32] {
@@ -121,7 +121,7 @@ pub fn verify(
         random_v: Fr::from(0u8),
     };
 
-    KZG10::check(vk, commitment_to_poly, evaluation_point, value, &proof).unwrap()
+    KzgBls12_381::check(vk, commitment_to_poly, evaluation_point, value, &proof).unwrap()
 }
 
 pub fn batch_verify(
@@ -140,7 +140,7 @@ pub fn batch_verify(
         proofs.push(proof);
     }
 
-    KZG10::batch_check(
+    KzgBls12_381::batch_check(
         vk,
         commitment_to_polynomials.as_slice(),
         &evaluation_points,

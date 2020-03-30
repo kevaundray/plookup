@@ -262,7 +262,7 @@ fn compute_n_lagrange_evaluations(domain_size: usize, n: usize) -> Vec<Fr> {
     lagrange_evaluations[n] = Fr::one();
     lagrange_evaluations
 }
-
+#[cfg(test)]
 mod test {
     use super::*;
     use crate::multiset::MultiSet;
