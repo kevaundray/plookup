@@ -69,7 +69,8 @@ fn compute_interval_check(
     let domain_2n: EvaluationDomain<Fr> = EvaluationDomain::new(2 * domain.size()).unwrap();
 
     // Compute last lagrange polynomial in evaluation form
-    let ln_evals = compute_n_lagrange_evaluations(domain_2n.size(), domain.size() - 1);
+    let ln_evals = compute_n_lagrange_evaluations(domain.size(), domain.size() - 1);
+    let ln_2n_evals = domain_2n.fft(&domain.ifft(&ln_evals));
 
     // Convert h_1 and h_2 to evaluation form
     let h_1_evals = domain_2n.fft(&h_1_poly);
@@ -82,10 +83,9 @@ fn compute_interval_check(
     let i_evals: Vec<_> = (0..domain_2n.size())
         .into_iter()
         .map(|i| {
-            let ln_i = ln_evals[i];
+            let ln_i = ln_2n_evals[i];
             let h_1_i = h_1_evals[i];
             let h_2_i_next = h_2_evals[i + 2];
-
             ln_i * (h_1_i - h_2_i_next)
         })
         .collect();
