@@ -69,7 +69,7 @@ fn compute_interval_check(
     let domain_2n: EvaluationDomain<Fr> = EvaluationDomain::new(2 * domain.size()).unwrap();
 
     // Compute last lagrange polynomial in evaluation form
-    let ln_evals = compute_n_lagrange_evaluations(domain_2n.size(), domain_2n.size() - 1);
+    let ln_evals = compute_n_lagrange_evaluations(domain_2n.size(), domain.size() - 1);
 
     // Convert h_1 and h_2 to evaluation form
     let h_1_evals = domain_2n.fft(&h_1_poly);
@@ -141,7 +141,7 @@ pub fn compute_term_check_a(
     let beta_one = Fr::one() + beta;
 
     // Compute the last element in the domain
-    let g_n = domain_4n.elements().last().unwrap();
+    let g_n = domain.elements().last().unwrap();
 
     let i_evals: Vec<_> = (0..domain_4n.size())
         .into_iter()
@@ -172,7 +172,7 @@ pub fn compute_term_check_a(
     let i_poly = Polynomial::from_coefficients_vec(domain_4n.ifft(&i_evals));
 
     assert_eq!(
-        i_poly.evaluate(domain_4n.elements().last().unwrap()),
+        i_poly.evaluate(domain.elements().last().unwrap()),
         Fr::zero()
     );
 
@@ -211,7 +211,7 @@ fn compute_term_check_b(
     // Compute (1 + beta)
     let beta_one = Fr::one() + beta;
     // Compute the last element in the domain
-    let g_n = domain_4n.elements().last().unwrap();
+    let g_n = domain.elements().last().unwrap();
 
     let i_evals: Vec<_> = (0..domain_4n.size())
         .into_iter()
@@ -240,7 +240,7 @@ fn compute_term_check_b(
     let i_poly = Polynomial::from_coefficients_vec(domain_4n.ifft(&i_evals));
 
     assert_eq!(
-        i_poly.evaluate(domain_4n.elements().last().unwrap()),
+        i_poly.evaluate(domain.elements().last().unwrap()),
         Fr::zero()
     );
 
@@ -268,7 +268,6 @@ mod test {
     use crate::multiset::MultiSet;
     use crate::multiset_equality::*;
     #[test]
-    #[ignore]
     fn test_quotient_poly() {
         // Compute f
         let mut f = MultiSet::new();
@@ -285,7 +284,6 @@ mod test {
 
         // Setup domain
         let domain: EvaluationDomain<Fr> = EvaluationDomain::new(f.len()).unwrap();
-        let domain_2n: EvaluationDomain<Fr> = EvaluationDomain::new(2 * f.len()).unwrap();
         let beta = Fr::from(10u8);
         let gamma = Fr::from(11u8);
 
@@ -300,17 +298,16 @@ mod test {
         let f_poly = f.to_polynomial(&domain);
         assert_eq!(f_poly.degree(), f.len());
         // Compute t(x)
-        let t_poly = t.to_polynomial(&domain_2n);
-        assert_eq!(t_poly.degree(), t.len());
+        let t_poly = t.to_polynomial(&domain);
+        assert_eq!(t_poly.degree(), t.len() - 1);
 
         // Compute Z(x) poly
         let z_evaluations = compute_accumulator_values(&f, &t, &h_1, &h_2, beta, gamma);
-        let z_poly = Polynomial::from_coefficients_vec(domain_2n.ifft(&z_evaluations));
+        let z_poly = Polynomial::from_coefficients_vec(domain.ifft(&z_evaluations));
 
         let (_, remainder) = compute(
             &domain, &z_poly, &f_poly, &t_poly, &h_1_poly, &h_2_poly, beta, gamma,
         );
-        // XXX: Last thing to do, the term check validation seems to produce a non-zero remainder.
         assert!(remainder.is_zero());
     }
 }
