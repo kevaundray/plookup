@@ -189,7 +189,7 @@ impl MultiSetEqualityProof {
             &self.q_proof.poly_commitment.unwrap(),
             &self.q_proof.witness_commitment,
             evaluation_challenge,
-            self.q_proof.evaluation,
+            expected_q,
         );
         assert!(ok);
 
