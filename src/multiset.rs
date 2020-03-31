@@ -1,7 +1,7 @@
 use algebra::bls12_381::Fr;
 use ff_fft::{DensePolynomial as Polynomial, EvaluationDomain};
+use num_traits::identities::{One, Zero};
 use std::ops::{Add, Mul};
-
 /// A MultiSet is a variation of a set, where we allow duplicate members
 /// This can be emulated in Rust by using vectors
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -94,17 +94,30 @@ impl MultiSet {
     pub fn to_polynomial(&self, domain: &EvaluationDomain<Fr>) -> Polynomial<Fr> {
         Polynomial::from_coefficients_vec(domain.ifft(&self.0))
     }
-    /// Aggregates three multisets together using a random challenge
+    /// Aggregates multisets together using a random challenge
     /// Eg. for three sets A,B,C and a random challenge `k`
     /// The aggregate is k^0 *A + k^1 * B + k^2 * C
-    pub fn aggregate(
-        sets: (&MultiSet, &MultiSet, &MultiSet),
-        challenges: (Fr, Fr, Fr),
-    ) -> MultiSet {
-        let agg_0 = sets.0 * challenges.0;
-        let agg_1 = sets.1 * challenges.1;
-        let agg_2 = sets.2 * challenges.2;
-        agg_0 + agg_1 + agg_2
+    pub fn aggregate(sets: Vec<&MultiSet>, challenge: Fr) -> MultiSet {
+        // First find the set with the most elements
+        let mut max = 0usize;
+        for set in sets.iter() {
+            if set.len() > max {
+                max = set.len()
+            }
+        }
+
+        let mut result = MultiSet(vec![Fr::zero(); max]);
+        let mut powers = Fr::one();
+
+        for set in sets {
+            let intermediate_set = set * powers;
+
+            result = result + intermediate_set;
+
+            powers = powers * challenge;
+        }
+
+        result
     }
 }
 
