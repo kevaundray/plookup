@@ -12,12 +12,22 @@ _Use At Your Own Risk_
 
 ```rust
 
+
+// First we generate our proving and verification key
+let (proving_key, verify_key) = trusted_setup();
+
 // First instantiate a Lookup table. In our case, we have a 4 bit XOR Table
 // However, the paper generalises to any multivariate function.
 let table = XOR4BitTable::new();
 
 // Now pass the table to the Lookup struct which will build the witness accordingly depending on your reads
 let mut lookup = LookUp::new(table);
+
+// We now preprocess the table with a specified _circuit size_
+// Importantly, note that the value of `n` here must be at least the number of entries in the table.
+// This is important because this value of `n` will usually be your circuit size. So our table now puts a lower bound on the circuit size. 
+let n = 2usize.pow(8);
+let preprocessed_table = table.preprocess(&proving_key,n);
 
 // Read will first check if (16 XOR 6) is in the 4-bit XOR table
 // If it is, it will fetch the output and add the input and output to the witness
@@ -38,7 +48,7 @@ lookup.output_wires.push(Fr::from(1234));
 // Once all reads have been made. You can create a proof, that all of the witness values are indeed
 // in the table. We create a random challenge by using a transcript object.
 let mut transcript = Transcript::new(b"lookup");
-let proof = lookup.prove(&proving_key, &mut transcript); 
+let proof = lookup.prove(&proving_key, preprocessed_table,&mut transcript); 
 
 ```
 
