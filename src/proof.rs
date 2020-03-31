@@ -1,4 +1,5 @@
 use crate::kzg10;
+use crate::lookup_table::PreProcessedTable;
 use crate::transcript::TranscriptProtocol;
 use algebra::bls12_381::Fr;
 use algebra::Bls12_381;
@@ -55,19 +56,19 @@ pub struct MultiSetEqualityProof {
     pub evaluations: Evaluations,
 
     pub commitments: Commitments,
-    // XXX: We include also the evaluations for t since the verifier cannot know pre-prover, what it is.
-    // Surely, we can take advantage of the fact that the verifier has the table in the preprocessing stage? Yes. The paper states this, so will need to figure this out
 }
 
 impl MultiSetEqualityProof {
     pub fn verify(
         &self,
         verification_key: &VerifierKey<Bls12_381>,
+        preprocessed_table: &PreProcessedTable,
         transcript: &mut dyn TranscriptProtocol,
     ) -> bool {
         let domain: EvaluationDomain<Fr> = EvaluationDomain::new(self.n).unwrap();
 
         let alpha = transcript.challenge_scalar(b"alpha");
+
         transcript.append_scalar(b"alpha", &alpha);
         transcript.append_commitment(b"h_1_poly", &self.commitments.h_1);
         transcript.append_commitment(b"h_2_poly", &self.commitments.h_2);
