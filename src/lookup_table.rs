@@ -1,6 +1,16 @@
+use crate::kzg10;
 use crate::multiset::MultiSet;
 use algebra::bls12_381::Fr;
+use algebra::Bls12_381;
+use poly_commit::kzg10::{Commitment, Powers};
 use std::collections::HashMap;
+
+pub struct PreProcessedTable {
+    pub n: usize,
+    pub t_1: (MultiSet, Commitment<Bls12_381>),
+    pub t_2: (MultiSet, Commitment<Bls12_381>),
+    pub t_3: (MultiSet, Commitment<Bls12_381>),
+}
 
 pub trait LookUpTable {
     /// Creates a new lookup table with its entries populated
@@ -46,6 +56,35 @@ pub trait LookUpTable {
             table_multiset_right,
             table_multiset_out,
         )
+    }
+    /// Pre-process a table by padding it to a size `n` commitment to each column in the table
+    /// `n` will usually be equal to the size of your circuit, when padded.
+    fn preprocess(&self, commit_key: &Powers<Bls12_381>, n: usize) -> PreProcessedTable {
+        assert!(n.is_power_of_two());
+
+        let (mut t_1, mut t_2, mut t_3) = self.to_multiset();
+
+        let k = t_1.len();
+        assert_eq!(t_1.len(), k);
+        assert_eq!(t_2.len(), k);
+        assert_eq!(t_3.len(), k);
+
+        // Pad
+        let pad_by = n - t_1.len();
+        t_1.extend(pad_by, t_1.last());
+        t_2.extend(pad_by, t_2.last());
+        t_3.extend(pad_by, t_3.last());
+
+        let t_1_commit = kzg10::commit_vec(commit_key, &t_1.0);
+        let t_2_commit = kzg10::commit_vec(commit_key, &t_2.0);
+        let t_3_commit = kzg10::commit_vec(commit_key, &t_3.0);
+
+        PreProcessedTable {
+            n: n,
+            t_1: (t_1, t_1_commit),
+            t_2: (t_2, t_2_commit),
+            t_3: (t_3, t_3_commit),
+        }
     }
 }
 
