@@ -1,5 +1,5 @@
 use crate::kzg10;
-use crate::lookup_table::LookUpTable;
+use crate::lookup_table::{LookUpTable, PreProcessedTable};
 use crate::multiset::MultiSet;
 use crate::multiset_equality;
 use crate::proof::{Commitments, Evaluations, MultiSetEqualityProof};
@@ -45,53 +45,36 @@ impl<T: LookUpTable> LookUp<T> {
         return true;
     }
 
-    // Pads the witness or table, so that len(table) = len(witness) + 1
-    // Due to FFTs, we apply additional padding so that table size is a power of two
-    fn pad(&self, witness: &mut MultiSet, table: &mut MultiSet) {
-        if witness.len() < table.len() {
-            // First pad the table multiset to next power of two
-            let pad_to_power_of_two = table.len().next_power_of_two() - table.len();
-            table.extend(pad_to_power_of_two, table.last());
-
-            // Then pad the witness to be one less than this power of two
-            let pad_amount = table.len() - witness.len() - 1;
-            witness.extend(pad_amount, witness.last())
-        } else {
-            // First pad the witness to be one less than a power of two
-            let pad_to_power_of_two = witness.len().next_power_of_two() - witness.len();
-            witness.extend(pad_to_power_of_two - 1, table.last());
-
-            // Then pad the table to be one more than the witness
-            let pad_amount = witness.len() + 1;
-            table.extend(pad_amount, table.last())
-        }
-    }
-
     /// Aggregates the table and witness values into one multiset
     /// sorts, and pads the witness and or table to be the correct size
-    pub fn to_multiset(&self, alpha: Fr) -> (MultiSet, MultiSet) {
-        // Compute challenge alpha^0, alpha^1, alpha^2
-        let one = Fr::from(1u8);
-        let alpha_sq = alpha * alpha;
-
-        // First get the witness as multisets
-        let left = &self.left_wires;
-        let right = &self.right_wires;
-        let output = &self.output_wires;
-
-        // Now lets get the table values as multisets
-        let (t_left, t_right, t_output) = self.table.to_multiset();
-
+    pub fn to_multiset(
+        &self,
+        preprocessed_table: &PreProcessedTable,
+        alpha: Fr,
+    ) -> (MultiSet, MultiSet) {
         // Now we need to aggregate our witness values into one multiset
-        let mut merged_witness = MultiSet::aggregate((left, right, output), (one, alpha, alpha_sq));
-        // Now we need to aggregate our table values into one multiset
-        let mut merged_table =
-            MultiSet::aggregate((&t_left, &t_right, &t_output), (one, alpha, alpha_sq));
-        // Sort merged table values
-        merged_table = merged_table.sort();
+        let mut merged_witness = MultiSet::aggregate(
+            vec![&self.left_wires, &self.right_wires, &self.output_wires],
+            alpha,
+        );
 
-        // Pad values
-        self.pad(&mut merged_witness, &mut merged_table);
+        // Now we need to aggregate our table values into one multiset
+        let mut merged_table = MultiSet::aggregate(
+            vec![
+                &preprocessed_table.t_1.0,
+                &preprocessed_table.t_2.0,
+                &preprocessed_table.t_3.0,
+            ],
+            alpha,
+        );
+        // Sort merged table values
+        // merged_table = merged_table.sort();
+
+        // Pad witness to be one less than `n`
+        assert!(merged_witness.len() < merged_table.len()); // XXX: We could incorporate this in the API by counting the number of reads
+        let pad_by = preprocessed_table.n - 1 - merged_witness.len();
+        merged_witness.extend(pad_by, merged_witness.last());
+
         (merged_witness, merged_table)
     }
 
@@ -99,15 +82,15 @@ impl<T: LookUpTable> LookUp<T> {
     pub fn prove(
         &self,
         proving_key: &Powers<Bls12_381>,
+        preprocessed_table: &PreProcessedTable,
         transcript: &mut dyn TranscriptProtocol,
     ) -> MultiSetEqualityProof {
         // Generate alpha challenge
         let alpha = transcript.challenge_scalar(b"alpha");
         transcript.append_scalar(b"alpha", &alpha);
 
-        // First we convert the table to a multiset and apply appropriate padding
-        let (f, t) = self.to_multiset(alpha);
-
+        // Aggregate witness and table values using a random challenge
+        let (f, t) = self.to_multiset(preprocessed_table, alpha);
         assert_eq!(f.len() + 1, t.len());
 
         let domain: EvaluationDomain<Fr> = EvaluationDomain::new(f.len()).unwrap();
@@ -212,7 +195,7 @@ impl<T: LookUpTable> LookUp<T> {
         let shifted_agg_witness_comm = kzg10::commit(proving_key, &shifted_agg_witness);
 
         MultiSetEqualityProof {
-            n: domain.size(),
+            n: preprocessed_table.n,
             evaluations: Evaluations {
                 f: f_eval,
                 t: t_eval,
@@ -246,7 +229,12 @@ mod test {
 
     #[test]
     fn test_pad_correct() {
+        // Setup SRS
+        let universal_parameters = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
+        let (proving_key, _) = kzg10::trim(&universal_parameters, 2usize.pow(12));
+
         let table = XOR4BitTable::new();
+        let preprocessed_table = table.preprocess(&proving_key, 2usize.pow(8));
 
         // Setup lookup and add 3 XOR reads into it
         let mut lookup = LookUp::new(table);
@@ -258,7 +246,7 @@ mod test {
         // Add 3 XOR 5
         lookup.read(&(Fr::from(1u8), Fr::from(2u8)));
 
-        let (f, t) = lookup.to_multiset(Fr::from(5u8));
+        let (f, t) = lookup.to_multiset(&preprocessed_table, Fr::from(5u8));
         assert_eq!(f.len() + 1, t.len());
 
         assert!(t.len().is_power_of_two());
@@ -266,7 +254,12 @@ mod test {
 
     #[test]
     fn test_inclusion() {
+        // Setup SRS
+        let universal_parameters = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
+        let (proving_key, _) = kzg10::trim(&universal_parameters, 2usize.pow(12));
+
         let table = XOR4BitTable::new();
+        let preprocessed_table = table.preprocess(&proving_key, 2usize.pow(8));
 
         let mut lookup = LookUp::new(table);
 
@@ -276,7 +269,8 @@ mod test {
         lookup.read(&(Fr::from(1u8), Fr::from(2u8)));
         // Add 3 XOR 5
         lookup.read(&(Fr::from(1u8), Fr::from(2u8)));
-        let (f, t) = lookup.to_multiset(Fr::from(5u8));
+
+        let (f, t) = lookup.to_multiset(&preprocessed_table, Fr::from(5u8));
         assert!(f.is_subset_of(&t));
     }
     #[test]
@@ -285,7 +279,13 @@ mod test {
         // If the value is not in the XOR4BitTable, it is not added to the witness
         // For a 4-bit XOR table the range is [0,15]
 
+        // Setup SRS
+        let universal_parameters = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
+        let (proving_key, _) = kzg10::trim(&universal_parameters, 2usize.pow(12));
+
         let table = XOR4BitTable::new();
+        let preprocessed_table = table.preprocess(&proving_key, 2usize.pow(8));
+
         let mut lookup = LookUp::new(table);
 
         let added = lookup.read(&(Fr::from(16u8), Fr::from(6u8)));
@@ -300,7 +300,7 @@ mod test {
         assert_eq!(lookup.right_wires.len(), 1);
         assert_eq!(lookup.output_wires.len(), 1);
 
-        let (f, t) = lookup.to_multiset(Fr::from(5u8));
+        let (f, t) = lookup.to_multiset(&preprocessed_table, Fr::from(5u8));
         assert!(f.is_subset_of(&t));
     }
     #[test]
@@ -311,6 +311,8 @@ mod test {
 
         // Setup Lookup with a 4 bit table
         let table = XOR4BitTable::new();
+        let preprocessed_table = table.preprocess(&proving_key, 2usize.pow(8));
+
         let mut lookup = LookUp::new(table);
 
         // Adds 1 XOR 2
@@ -321,9 +323,10 @@ mod test {
         lookup.read(&(Fr::from(3u8), Fr::from(5u8)));
 
         let mut prover_transcript = Transcript::new(b"lookup");
-        let proof = lookup.prove(&proving_key, &mut prover_transcript);
+        let proof = lookup.prove(&proving_key, &preprocessed_table, &mut prover_transcript);
 
         let mut verifier_transcript = Transcript::new(b"lookup");
-        proof.verify(&verifier_key, &mut verifier_transcript);
+        let ok = proof.verify(&verifier_key, &preprocessed_table, &mut verifier_transcript);
+        assert!(ok);
     }
 }
