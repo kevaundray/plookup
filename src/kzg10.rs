@@ -53,6 +53,11 @@ pub fn commit(powers: &Powers<Bls12_381>, p: &Polynomial<Fr>) -> Commitment<Bls1
     comm
 }
 
+pub fn commit_vec(powers: &Powers<Bls12_381>, p_vec: &Vec<Fr>) -> Commitment<Bls12_381> {
+    let p = Polynomial::from_coefficients_slice(p_vec);
+    commit(powers, &p)
+}
+
 // Computes the witness for a set of polynomials evaluated at the same point
 // W(X) = f(x) - f(z) / x-z
 // However, the quotient is invariant under `f(z)`,
