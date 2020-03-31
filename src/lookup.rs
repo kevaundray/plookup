@@ -68,7 +68,7 @@ impl<T: LookUpTable> LookUp<T> {
             alpha,
         );
         // Sort merged table values
-        // merged_table = merged_table.sort();
+        merged_table = merged_table.sort();
 
         // Pad witness to be one less than `n`
         assert!(merged_witness.len() < merged_table.len()); // XXX: We could incorporate this in the API by counting the number of reads
