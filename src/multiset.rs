@@ -22,7 +22,7 @@ impl MultiSet {
         self.0.extend(elements);
     }
     /// Fetches last element in multiset
-    /// Panics if there are no elementss
+    /// Panics if there are no elements
     pub fn last(&self) -> Fr {
         *self.0.last().unwrap()
     }
