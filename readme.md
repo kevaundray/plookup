@@ -64,3 +64,5 @@ let proof = lookup.prove(&proving_key, &mut transcript);
 - This POC does not aggregate the witness. We will therefore have a witness per commitment, in reality, we will have one witness for all polynomials, since they are all evaluated at the same point. This was done for easier debugging. 
 
 - So that the domains match, the number of elements in the tables multiset, will need to be padded until it is the same size of the domain used in PLONK.
+
+- Your table size determines your minimum circuit size. If you have a table of size 2^4 entries, then you must have a circuit of at least 2^4.
