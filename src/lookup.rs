@@ -48,16 +48,10 @@ impl<T: LookUpTable> LookUp<T> {
     /// Aggregates the table and witness values into one multiset
     /// sorts, and pads the witness and or table to be the correct size
     pub fn to_multiset(
-        &self,
+        &mut self,
         preprocessed_table: &PreProcessedTable,
         alpha: Fr,
     ) -> (MultiSet, MultiSet) {
-        // Now we need to aggregate our witness values into one multiset
-        let mut merged_witness = MultiSet::aggregate(
-            vec![&self.left_wires, &self.right_wires, &self.output_wires],
-            alpha,
-        );
-
         // Now we need to aggregate our table values into one multiset
         let mut merged_table = MultiSet::aggregate(
             vec![
@@ -70,17 +64,28 @@ impl<T: LookUpTable> LookUp<T> {
         // Sort merged table values
         merged_table = merged_table.sort();
 
-        // Pad witness to be one less than `n`
+        // Pad left, right and output wires to be one less than the table multiset
+        let pad_by = preprocessed_table.n - 1 - self.left_wires.len();
+        self.left_wires.extend(pad_by, self.left_wires.last());
+
+        self.right_wires.extend(pad_by, self.right_wires.last());
+
+        self.output_wires.extend(pad_by, self.output_wires.last());
+
+        // Now we need to aggregate our witness values into one multiset
+        let merged_witness = MultiSet::aggregate(
+            vec![&self.left_wires, &self.right_wires, &self.output_wires],
+            alpha,
+        );
+
         assert!(merged_witness.len() < merged_table.len()); // XXX: We could incorporate this in the API by counting the number of reads
-        let pad_by = preprocessed_table.n - 1 - merged_witness.len();
-        merged_witness.extend(pad_by, merged_witness.last());
 
         (merged_witness, merged_table)
     }
 
     /// Creates a proof that the multiset is within the table
     pub fn prove(
-        &self,
+        &mut self,
         proving_key: &Powers<Bls12_381>,
         preprocessed_table: &PreProcessedTable,
         transcript: &mut dyn TranscriptProtocol,
@@ -107,8 +112,7 @@ mod test {
     #[test]
     fn test_pad_correct() {
         // Setup SRS
-        let universal_parameters = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
-        let (proving_key, _) = kzg10::trim(&universal_parameters, 2usize.pow(12));
+        let (proving_key, _) = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
 
         let table = XOR4BitTable::new();
         let preprocessed_table = table.preprocess(&proving_key, 2usize.pow(8));
@@ -132,8 +136,7 @@ mod test {
     #[test]
     fn test_inclusion() {
         // Setup SRS
-        let universal_parameters = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
-        let (proving_key, _) = kzg10::trim(&universal_parameters, 2usize.pow(12));
+        let (proving_key, _) = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
 
         let table = XOR4BitTable::new();
         let preprocessed_table = table.preprocess(&proving_key, 2usize.pow(8));
@@ -157,8 +160,7 @@ mod test {
         // For a 4-bit XOR table the range is [0,15]
 
         // Setup SRS
-        let universal_parameters = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
-        let (proving_key, _) = kzg10::trim(&universal_parameters, 2usize.pow(12));
+        let (proving_key, _) = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
 
         let table = XOR4BitTable::new();
         let preprocessed_table = table.preprocess(&proving_key, 2usize.pow(8));
@@ -183,8 +185,7 @@ mod test {
     #[test]
     fn test_proof() {
         // Setup SRS
-        let universal_parameters = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
-        let (proving_key, verifier_key) = kzg10::trim(&universal_parameters, 2usize.pow(12));
+        let (proving_key, verifier_key) = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
 
         // Setup Lookup with a 4 bit table
         let table = XOR4BitTable::new();

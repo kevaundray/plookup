@@ -9,9 +9,13 @@ use rand_core::SeedableRng;
 // Modification of https://github.com/scipr-lab/poly-commit/blob/master/src/kzg10/mod.rs
 type KzgBls12_381 = KZG10<Bls12_381>;
 
-pub fn trusted_setup(max_deg: usize, seed: &[u8]) -> UniversalParams<Bls12_381> {
+pub fn trusted_setup<'a>(
+    max_deg: usize,
+    seed: &[u8],
+) -> (Powers<'a, Bls12_381>, VerifierKey<Bls12_381>) {
     let mut rng = ChaChaRng::from_seed(to_32_bytes(seed));
-    KzgBls12_381::setup(max_deg, false, &mut rng).unwrap()
+    let pp = KzgBls12_381::setup(max_deg, false, &mut rng).unwrap();
+    trim(&pp, max_deg)
 }
 
 fn to_32_bytes(bytes: &[u8]) -> [u8; 32] {
@@ -22,7 +26,7 @@ fn to_32_bytes(bytes: &[u8]) -> [u8; 32] {
     array
 }
 
-pub fn trim<'a>(
+fn trim<'a>(
     pp: &UniversalParams<Bls12_381>,
     mut supported_degree: usize,
 ) -> (Powers<'a, Bls12_381>, VerifierKey<Bls12_381>) {
