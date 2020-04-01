@@ -51,8 +51,13 @@ impl MultiSet {
     /// SortedBy checks whether every value in self appears in the same order as t
     /// Example: self = [1,2,2] t = [1,2,3] returns true
     /// Example : self = [2,1] t = [1,2] returns false
-    pub fn sorted_by(&self, _t: &MultiSet) -> bool {
-        todo!()
+    pub fn sorted_by(&self, t: &MultiSet) -> bool {
+        let mut i = 0;
+        for element in self.0.iter() {
+            while (i < t.0.len()) && (t.0[i] != *element) { i += 1; }
+            if i == t.0.len() { return false; }
+        }
+        true
     }
     /// Checks whether self is a subset of other
     pub fn is_subset_of(&self, other: &MultiSet) -> bool {
@@ -75,7 +80,7 @@ impl MultiSet {
     /// Splits a multiset into halves as specified by the paper
     /// If s = [1,2,3,4,5,6,7], we can deduce n using |s| = 2 * n + 1 = 7
     /// n is therefore 3
-    /// We split s into two MultiSets of size n+1 each  
+    /// We split s into two MultiSets of size n+1 each
     /// s_0 = [1,2,3,4] ,|s_0| = n+1 = 4
     /// s_1 = [4,5,6,7] , |s_1| = n+1 = 4
     /// Notice that the last element of the first half equals the first element in the second half
@@ -297,5 +302,57 @@ mod test {
 
         assert!(b.is_subset_of(&a));
         assert!(!c.is_subset_of(&a));
+    }
+    #[test]
+    fn test_sorted_by() {
+        let a = MultiSet(vec![
+            Fr::from(50u64),
+            Fr::from(20u64),
+            Fr::from(20u64),
+            Fr::from(30u64),
+            Fr::from(30u64),
+            Fr::from(40u64),
+        ]);
+        let b = MultiSet(vec![
+            Fr::from(50u64),
+            Fr::from(20u64),
+            Fr::from(30u64),
+            Fr::from(40u64),
+            Fr::from(10u64),
+        ]);
+
+        assert_eq!(a.sorted_by(&b), true);
+
+        let c = MultiSet(vec![
+            Fr::from(50u64),
+            Fr::from(20u64),
+        ]);
+        let d = MultiSet(vec![
+            Fr::from(20u64),
+            Fr::from(50u64),
+        ]);
+
+        assert_eq!(c.sorted_by(&d), false);
+        assert_eq!(d.sorted_by(&c), false);
+
+        let e = MultiSet(vec![
+            Fr::from(50u64),
+            Fr::from(20u64),
+            Fr::from(20u64),
+        ]);
+        let f = MultiSet(vec![
+            Fr::from(50u64),
+            Fr::from(20u64),
+            Fr::from(30u64),
+        ]);
+
+        assert_eq!(e.sorted_by(&f), true);
+        assert_eq!(f.sorted_by(&e), false);
+
+        let g = MultiSet::new();
+        let h = MultiSet(vec![Fr::from(10u64)]);
+
+        assert_eq!(g.sorted_by(&f), true);
+        assert_eq!(f.sorted_by(&g), false);
     }
 }
