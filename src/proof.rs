@@ -68,7 +68,14 @@ impl MultiSetEqualityProof {
         let domain: EvaluationDomain<Fr> = EvaluationDomain::new(self.n).unwrap();
 
         let alpha = transcript.challenge_scalar(b"alpha");
-
+        let merged_table_commit = kzg10::aggregate_commitments(
+            vec![
+                &preprocessed_table.t_1.1,
+                &preprocessed_table.t_2.1,
+                &preprocessed_table.t_3.1,
+            ],
+            alpha,
+        );
         transcript.append_scalar(b"alpha", &alpha);
         transcript.append_commitment(b"h_1_poly", &self.commitments.h_1);
         transcript.append_commitment(b"h_2_poly", &self.commitments.h_2);
@@ -101,7 +108,7 @@ impl MultiSetEqualityProof {
         let agg_commitment = kzg10::aggregate_commitments(
             vec![
                 &self.commitments.f,
-                &self.commitments.t,
+                &merged_table_commit,
                 &self.commitments.h_1,
                 &self.commitments.h_2,
                 &self.commitments.z,
@@ -124,7 +131,7 @@ impl MultiSetEqualityProof {
         // Create aggregate opening proof for all polynomials evaluated at the shifted evaluation challenge `z * omega`
         let shifted_agg_commitment = kzg10::aggregate_commitments(
             vec![
-                &self.commitments.t,
+                &merged_table_commit,
                 &self.commitments.h_1,
                 &self.commitments.h_2,
                 &self.commitments.z,
