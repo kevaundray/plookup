@@ -2,14 +2,15 @@ use crate::kzg10;
 use crate::multiset::MultiSet;
 use algebra::bls12_381::Fr;
 use algebra::Bls12_381;
+use ff_fft::{DensePolynomial as Polynomial, EvaluationDomain};
 use poly_commit::kzg10::{Commitment, Powers};
 use std::collections::HashMap;
 
 pub struct PreProcessedTable {
     pub n: usize,
-    pub t_1: (MultiSet, Commitment<Bls12_381>),
-    pub t_2: (MultiSet, Commitment<Bls12_381>),
-    pub t_3: (MultiSet, Commitment<Bls12_381>),
+    pub t_1: (MultiSet, Commitment<Bls12_381>, Polynomial<Fr>),
+    pub t_2: (MultiSet, Commitment<Bls12_381>, Polynomial<Fr>),
+    pub t_3: (MultiSet, Commitment<Bls12_381>, Polynomial<Fr>),
 }
 
 pub trait LookUpTable {
@@ -69,21 +70,27 @@ pub trait LookUpTable {
         assert_eq!(t_2.len(), k);
         assert_eq!(t_3.len(), k);
 
+        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(n).unwrap();
+
         // Pad
         let pad_by = n - t_1.len();
         t_1.extend(pad_by, t_1.last());
         t_2.extend(pad_by, t_2.last());
         t_3.extend(pad_by, t_3.last());
 
-        let t_1_commit = kzg10::commit_vec(commit_key, &t_1.0);
-        let t_2_commit = kzg10::commit_vec(commit_key, &t_2.0);
-        let t_3_commit = kzg10::commit_vec(commit_key, &t_3.0);
+        let t_1_poly = Polynomial::from_coefficients_vec(domain.ifft(&t_1.0));
+        let t_2_poly = Polynomial::from_coefficients_vec(domain.ifft(&t_2.0));
+        let t_3_poly = Polynomial::from_coefficients_vec(domain.ifft(&t_3.0));
+
+        let t_1_commit = kzg10::commit(commit_key, &t_1_poly);
+        let t_2_commit = kzg10::commit(commit_key, &t_2_poly);
+        let t_3_commit = kzg10::commit(commit_key, &t_3_poly);
 
         PreProcessedTable {
             n: n,
-            t_1: (t_1, t_1_commit),
-            t_2: (t_2, t_2_commit),
-            t_3: (t_3, t_3_commit),
+            t_1: (t_1, t_1_commit, t_1_poly),
+            t_2: (t_2, t_2_commit, t_2_poly),
+            t_3: (t_3, t_3_commit, t_3_poly),
         }
     }
 }
@@ -98,6 +105,29 @@ impl LookUpTable for XOR4BitTable {
         for i in 0..=15 {
             for k in 0..=15 {
                 let result = i ^ k;
+                table.0.insert(
+                    (Fr::from(i as u8), Fr::from(k as u8)),
+                    Fr::from(result as u8),
+                );
+            }
+        }
+        table
+    }
+
+    fn borrow_map(&self) -> &HashMap<(Fr, Fr), Fr> {
+        &self.0
+    }
+}
+pub struct Add4BitTable(HashMap<(Fr, Fr), Fr>);
+
+impl LookUpTable for Add4BitTable {
+    // Initialise all 4 bit combinations of Ad
+    fn new() -> Self {
+        let mut table = Add4BitTable(HashMap::new());
+
+        for i in 0..=15 {
+            for k in 0..=15 {
+                let result = i + k;
                 table.0.insert(
                     (Fr::from(i as u8), Fr::from(k as u8)),
                     Fr::from(result as u8),
