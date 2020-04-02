@@ -12,11 +12,11 @@ use poly_commit::kzg10::Powers;
 pub fn compute_h1_h2(f: &MultiSet, t: &MultiSet) -> (MultiSet, MultiSet) {
     //
     // 1. Compute s
-    // XXX: check if s is (f,t) sorted by t? (Tests will fail anyways according to the proof, so may be better to skip)
-    let s = f.concatenate(&t).sort();
+    // XXX: we no longer use sorted by t definition
+    let sorted_s = f.concatenate_and_sort(&t);
 
     //2 . Compute h_1 and h_2
-    let (h_1, h_2) = s.halve();
+    let (h_1, h_2) = sorted_s.halve();
     // assert that the last element of h_1 is equal to the first element of h_2
     assert_eq!(h_1.0.last().unwrap(), &h_2.0[0]);
     (h_1, h_2)
@@ -97,7 +97,7 @@ pub fn prove(
     proving_key: &Powers<Bls12_381>,
     transcript: &mut dyn TranscriptProtocol,
 ) -> MultiSetEqualityProof {
-    let domain: EvaluationDomain<Fr> = EvaluationDomain::new(f.len()).unwrap();
+    let domain: EvaluationDomain<Fr> = EvaluationDomain::new(t.len()).unwrap();
 
     // Convert witness and table to polynomials
     let f_poly = f.to_polynomial(&domain);
