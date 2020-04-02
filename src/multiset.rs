@@ -34,12 +34,6 @@ impl MultiSet {
         self.0.len()
     }
 
-    /// Sorts an multiset in ascending order
-    pub fn sort(&self) -> MultiSet {
-        let mut cloned = self.0.clone();
-        cloned.sort();
-        MultiSet(cloned)
-    }
     /// Concatenates two sets together
     /// Does not sort the concatenated multisets
     pub fn concatenate(&self, other: &MultiSet) -> MultiSet {
@@ -48,21 +42,32 @@ impl MultiSet {
         result.extend(&other.0);
         MultiSet(result)
     }
-    /// SortedBy checks whether every value in self appears in the same order as t
-    /// Example: self = [1,2,2] t = [1,2,3] returns true
-    /// Example : self = [2,1] t = [1,2] returns false
-    pub fn sorted_by(&self, t: &MultiSet) -> bool {
-        let mut i = 0;
-        for element in self.0.iter() {
-            while (i < t.0.len()) && (t.0[i] != *element) { i += 1; }
-            if i == t.0.len() { return false; }
-        }
-        true
+
+    /// Returns the position of the element in the Multiset
+    /// Panics if element is not in the Multiset
+    fn position(&self, element: &Fr) -> usize {
+        let index = self.0.iter().position(|&x| x == *element).unwrap();
+        index
     }
+
+    /// Performs a element-wise insertion into the second multiset
+    /// Example: f {1,2,3,1} t : {3,1,2,3}
+    /// We now take each element from f and find the element in `t` then insert the element from `f` into right next to it's duplicate
+    /// We are assuming that `f` is contained in `t`
+    pub fn concatenate_and_sort(&self, t: &MultiSet) -> MultiSet {
+        assert!(self.is_subset_of(t));
+        let mut result = t.clone();
+
+        for element in self.0.iter() {
+            let index = result.position(element);
+            result.0.insert(index, *element);
+        }
+
+        result
+    }
+
     /// Checks whether self is a subset of other
     pub fn is_subset_of(&self, other: &MultiSet) -> bool {
-        assert!(other.len() >= self.len());
-
         let mut is_subset = true;
 
         for x in self.0.iter() {
@@ -157,27 +162,7 @@ impl Mul<Fr> for &MultiSet {
 mod test {
     use super::*;
     #[test]
-    fn test_sort() {
-        let unsorted_set = MultiSet(vec![
-            Fr::from(50u64),
-            Fr::from(20u64),
-            Fr::from(30u64),
-            Fr::from(40u64),
-        ]);
-        let expected_sorted_multiset = MultiSet(vec![
-            Fr::from(20u64),
-            Fr::from(30u64),
-            Fr::from(40u64),
-            Fr::from(50u64),
-        ]);
-
-        let sorted_set = unsorted_set.sort();
-        assert_eq!(sorted_set, expected_sorted_multiset);
-        assert_ne!(sorted_set, unsorted_set);
-    }
-
-    #[test]
-    fn test_concat() {
+    fn test_concatenate() {
         let mut a = MultiSet::new();
         a.push(Fr::from(1u64));
         a.push(Fr::from(2u64));
@@ -193,33 +178,6 @@ mod test {
             Fr::from(1u64),
             Fr::from(2u64),
             Fr::from(3u64),
-            Fr::from(4u64),
-            Fr::from(5u64),
-            Fr::from(6u64),
-        ]);
-        assert_eq!(expected_set, c);
-    }
-
-    #[test]
-    fn test_concat_sort() {
-        let mut a = MultiSet::new();
-        a.push(Fr::from(2u64));
-        a.push(Fr::from(2u64));
-        a.push(Fr::from(3u64));
-        a.push(Fr::from(1u64));
-        let mut b = MultiSet::new();
-        b.push(Fr::from(6u64));
-        b.push(Fr::from(4u64));
-        b.push(Fr::from(4u64));
-        b.push(Fr::from(5u64));
-        let c = a.concatenate(&b).sort();
-
-        let expected_set = MultiSet(vec![
-            Fr::from(1u64),
-            Fr::from(2u64),
-            Fr::from(2u64),
-            Fr::from(3u64),
-            Fr::from(4u64),
             Fr::from(4u64),
             Fr::from(5u64),
             Fr::from(6u64),
@@ -304,55 +262,100 @@ mod test {
         assert!(!c.is_subset_of(&a));
     }
     #[test]
-    fn test_sorted_by() {
-        let a = MultiSet(vec![
-            Fr::from(50u64),
-            Fr::from(20u64),
-            Fr::from(20u64),
-            Fr::from(30u64),
-            Fr::from(30u64),
-            Fr::from(40u64),
-        ]);
-        let b = MultiSet(vec![
-            Fr::from(50u64),
-            Fr::from(20u64),
-            Fr::from(30u64),
-            Fr::from(40u64),
-            Fr::from(10u64),
-        ]);
+    fn test_sort_by() {
+        let mut f = MultiSet::new();
+        f.push(Fr::from(2u8));
+        f.push(Fr::from(1u8));
+        f.push(Fr::from(2u8));
+        f.push(Fr::from(4u8));
+        f.push(Fr::from(3u8));
 
-        assert_eq!(a.sorted_by(&b), true);
+        let mut t = MultiSet::new();
+        t.push(Fr::from(3u8));
+        t.push(Fr::from(1u8));
+        t.push(Fr::from(2u8));
+        t.push(Fr::from(4u8));
 
-        let c = MultiSet(vec![
-            Fr::from(50u64),
-            Fr::from(20u64),
-        ]);
-        let d = MultiSet(vec![
-            Fr::from(20u64),
-            Fr::from(50u64),
-        ]);
+        let sorted_s = f.concatenate_and_sort(&t);
 
-        assert_eq!(c.sorted_by(&d), false);
-        assert_eq!(d.sorted_by(&c), false);
+        let mut expected_sorted_s = MultiSet::new();
+        expected_sorted_s.push(Fr::from(3u8));
+        expected_sorted_s.push(Fr::from(3u8));
+        expected_sorted_s.push(Fr::from(1u8));
+        expected_sorted_s.push(Fr::from(1u8));
+        expected_sorted_s.push(Fr::from(2u8));
+        expected_sorted_s.push(Fr::from(2u8));
+        expected_sorted_s.push(Fr::from(2u8));
+        expected_sorted_s.push(Fr::from(4u8));
+        expected_sorted_s.push(Fr::from(4u8));
 
-        let e = MultiSet(vec![
-            Fr::from(50u64),
-            Fr::from(20u64),
-            Fr::from(20u64),
-        ]);
-        let f = MultiSet(vec![
-            Fr::from(50u64),
-            Fr::from(20u64),
-            Fr::from(30u64),
-        ]);
+        assert_eq!(expected_sorted_s, sorted_s);
+    }
 
-        assert_eq!(e.sorted_by(&f), true);
-        assert_eq!(f.sorted_by(&e), false);
+    #[test]
+    fn test_concate_sort() {
+        let mut f = MultiSet::new();
+        f.push(Fr::from(1u8));
+        f.push(Fr::from(2u8));
 
-        let g = MultiSet::new();
-        let h = MultiSet(vec![Fr::from(10u64)]);
+        // Table of values
+        let mut t = MultiSet::new();
+        t.push(Fr::from(2u8));
+        t.push(Fr::from(1u8));
+        t.push(Fr::from(2u8));
 
-        assert_eq!(g.sorted_by(&f), true);
-        assert_eq!(f.sorted_by(&g), false);
+        let mut expected_s = MultiSet::new();
+        expected_s.push(Fr::from(2u8));
+        expected_s.push(Fr::from(2u8));
+        expected_s.push(Fr::from(1u8));
+        expected_s.push(Fr::from(1u8));
+        expected_s.push(Fr::from(2u8));
+
+        let sorted_s_1 = f.concatenate_and_sort(&t);
+        assert_eq!(sorted_s_1, expected_s)
+    }
+    #[test]
+    fn test_concate_sort2() {
+        let mut f = MultiSet::new();
+        f.push(Fr::from(1u8));
+        f.push(Fr::from(1u8));
+        f.push(Fr::from(2u8));
+        f.push(Fr::from(2u8));
+        f.push(Fr::from(3u8));
+        f.push(Fr::from(3u8));
+        f.push(Fr::from(3u8));
+
+        // Table of values
+        let mut t = MultiSet::new();
+        t.push(Fr::from(1u8));
+        t.push(Fr::from(1u8));
+        t.push(Fr::from(2u8));
+        t.push(Fr::from(2u8));
+        t.push(Fr::from(3u8));
+        t.push(Fr::from(3u8));
+        t.push(Fr::from(4u8));
+        t.push(Fr::from(5u8));
+
+        let mut expected_sorted_s = MultiSet::new();
+        expected_sorted_s.push(Fr::from(1u8));
+        expected_sorted_s.push(Fr::from(1u8));
+        expected_sorted_s.push(Fr::from(1u8));
+        expected_sorted_s.push(Fr::from(1u8));
+        expected_sorted_s.push(Fr::from(2u8));
+        expected_sorted_s.push(Fr::from(2u8));
+        expected_sorted_s.push(Fr::from(2u8));
+        expected_sorted_s.push(Fr::from(2u8));
+        expected_sorted_s.push(Fr::from(3u8));
+        expected_sorted_s.push(Fr::from(3u8));
+        expected_sorted_s.push(Fr::from(3u8));
+        expected_sorted_s.push(Fr::from(3u8));
+        expected_sorted_s.push(Fr::from(3u8));
+        expected_sorted_s.push(Fr::from(4u8));
+        expected_sorted_s.push(Fr::from(5u8));
+
+        let sorted_s = f.concatenate_and_sort(&t);
+        assert_eq!(sorted_s.len(), f.len() + t.len());
+        assert_eq!(sorted_s.len(), expected_sorted_s.len());
+        assert_eq!(sorted_s, expected_sorted_s)
     }
 }
