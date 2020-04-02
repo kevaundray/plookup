@@ -1,13 +1,10 @@
-use crate::kzg10;
 use crate::lookup_table::{LookUpTable, PreProcessedTable};
 use crate::multiset::MultiSet;
 use crate::multiset_equality;
-use crate::proof::{Commitments, Evaluations, MultiSetEqualityProof};
-use crate::quotient_poly;
+use crate::proof::MultiSetEqualityProof;
 use crate::transcript::TranscriptProtocol;
 use algebra::bls12_381::Fr;
 use algebra::Bls12_381;
-use ff_fft::{DensePolynomial as Polynomial, EvaluationDomain};
 use poly_commit::kzg10::Powers;
 pub struct LookUp<T: LookUpTable> {
     table: T,
@@ -53,7 +50,7 @@ impl<T: LookUpTable> LookUp<T> {
         alpha: Fr,
     ) -> (MultiSet, MultiSet) {
         // Now we need to aggregate our table values into one multiset
-        let mut merged_table = MultiSet::aggregate(
+        let merged_table = MultiSet::aggregate(
             vec![
                 &preprocessed_table.t_1.0,
                 &preprocessed_table.t_2.0,
@@ -61,24 +58,17 @@ impl<T: LookUpTable> LookUp<T> {
             ],
             alpha,
         );
-        // Sort merged table values
-        merged_table = merged_table.sort();
-
-        // Pad left, right and output wires to be one less than the table multiset
-        let pad_by = preprocessed_table.n - 1 - self.left_wires.len();
-        self.left_wires.extend(pad_by, self.left_wires.last());
-
-        self.right_wires.extend(pad_by, self.right_wires.last());
-
-        self.output_wires.extend(pad_by, self.output_wires.last());
 
         // Now we need to aggregate our witness values into one multiset
-        let merged_witness = MultiSet::aggregate(
+        let mut merged_witness = MultiSet::aggregate(
             vec![&self.left_wires, &self.right_wires, &self.output_wires],
             alpha,
         );
 
+        // Pad witness to be one less than `n`
         assert!(merged_witness.len() < merged_table.len()); // XXX: We could incorporate this in the API by counting the number of reads
+        let pad_by = preprocessed_table.n - 1 - merged_witness.len();
+        merged_witness.extend(pad_by, merged_witness.last());
 
         (merged_witness, merged_table)
     }
@@ -106,6 +96,7 @@ impl<T: LookUpTable> LookUp<T> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::kzg10;
     use crate::lookup_table::XOR4BitTable;
     use merlin::Transcript;
 
