@@ -1,7 +1,5 @@
-use crate::kzg10;
-use crate::multiset::MultiSet;
-use algebra::bls12_381::Fr;
-use algebra::Bls12_381;
+use crate::{kzg10, multiset::MultiSet};
+use algebra::{bls12_381::Fr, Bls12_381};
 use ff_fft::{DensePolynomial as Polynomial, EvaluationDomain};
 use poly_commit::kzg10::{Commitment, Powers};
 use std::collections::HashMap;
