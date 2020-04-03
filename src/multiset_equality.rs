@@ -198,7 +198,6 @@ pub fn prove(
     let shifted_agg_witness_comm = kzg10::commit(proving_key, &shifted_agg_witness);
 
     MultiSetEqualityProof {
-        n: domain.size(),
         evaluations: Evaluations {
             f: f_eval,
             t: t_eval,

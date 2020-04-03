@@ -46,10 +46,6 @@ pub struct Commitments {
 //
 // Lastly, the Witness commitments can also be batched with the PLONK opening Proof.
 pub struct MultiSetEqualityProof {
-    //Size of the domain
-    // XXX: Verifier should have this value
-    pub n: usize,
-
     pub aggregate_witness_comm: Commitment<Bls12_381>,
     pub shifted_aggregate_witness_comm: Commitment<Bls12_381>,
 
@@ -65,7 +61,7 @@ impl MultiSetEqualityProof {
         preprocessed_table: &PreProcessedTable,
         transcript: &mut dyn TranscriptProtocol,
     ) -> bool {
-        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(self.n).unwrap();
+        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(preprocessed_table.n).unwrap();
 
         let alpha = transcript.challenge_scalar(b"alpha");
         let merged_table_commit = kzg10::aggregate_commitments(
