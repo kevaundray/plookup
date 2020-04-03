@@ -24,9 +24,9 @@ impl LookUpProof {
         transcript.append_scalar(b"alpha", &alpha);
 
         // Aggregates the table and witness values into one multiset
-        // sorts, and pads the witness and or table to be the correct size
+        // and pads the witness to be the correct size
         //
-        // Now we need to aggregate our table values into one multiset
+        // Aggregate our table values into one multiset
         let merged_table = MultiSet::aggregate(
             vec![
                 &preprocessed_table.t_1.0,
@@ -36,6 +36,7 @@ impl LookUpProof {
             alpha,
         );
 
+        // Aggregate witness values into one multiset
         let mut merged_witness = MultiSet::aggregate(vec![f_1, f_2, f_3], alpha);
 
         // Pad merged Witness to be one less than `n`
