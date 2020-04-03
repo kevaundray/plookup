@@ -26,7 +26,6 @@ pub struct Evaluations {
 pub struct Commitments {
     pub f: Commitment<Bls12_381>,
     pub q: Commitment<Bls12_381>,
-    pub t: Commitment<Bls12_381>,
     pub h_1: Commitment<Bls12_381>,
     pub h_2: Commitment<Bls12_381>,
     pub z: Commitment<Bls12_381>,

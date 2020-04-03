@@ -104,7 +104,6 @@ pub fn prove(
     let f_commit = kzg10::commit(proving_key, &f_poly);
 
     let t_poly = t.to_polynomial(&domain);
-    let t_commit = kzg10::commit(proving_key, &t_poly);
 
     // Compute h_1 and h_2
     let (h_1, h_2) = compute_h1_h2(&f, &t);
@@ -212,7 +211,6 @@ pub fn prove(
         commitments: Commitments {
             f: f_commit,
             q: q_commit,
-            t: t_commit,
             h_1: h_1_commit,
             h_2: h_2_commit,
             z: z_commit,
