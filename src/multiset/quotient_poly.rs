@@ -265,8 +265,7 @@ fn compute_n_lagrange_evaluations(domain_size: usize, n: usize) -> Vec<Fr> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::multiset::MultiSet;
-    use crate::multiset_equality::*;
+    use crate::multiset::{multiset_equality::*, MultiSet};
     #[test]
     fn test_quotient_poly() {
         // Compute f

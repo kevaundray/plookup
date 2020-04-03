@@ -1,12 +1,11 @@
-use crate::kzg10;
-use crate::lookup_table::PreProcessedTable;
-use crate::transcript::TranscriptProtocol;
-use algebra::bls12_381::Fr;
-use algebra::Bls12_381;
-use ff_fft::EvaluationDomain;
-use poly_commit::kzg10::Commitment;
-use poly_commit::kzg10::VerifierKey;
-
+use crate::{
+    kzg10,
+    multiset::{multiset_equality, quotient_poly, MultiSet},
+    transcript::TranscriptProtocol,
+};
+use algebra::{bls12_381::Fr, Bls12_381};
+use ff_fft::{DensePolynomial as Polynomial, EvaluationDomain};
+use poly_commit::kzg10::{Commitment, Powers, VerifierKey};
 // Evaluations store the evaluations of different polynomial.
 // `t` denotes that the polynomial was evaluated at t(z) for some random evaluation challenge `z`
 // `t_omega` denotes the polynomial was evaluated at t(z * omega) where omega is the group generator
@@ -44,7 +43,7 @@ pub struct Commitments {
 // q_eval which is the quotient evaluation is usually created from the prover messages
 //
 // Lastly, the Witness commitments can also be batched with the PLONK opening Proof.
-pub struct MultiSetEqualityProof {
+pub struct EqualityProof {
     pub aggregate_witness_comm: Commitment<Bls12_381>,
     pub shifted_aggregate_witness_comm: Commitment<Bls12_381>,
 
@@ -53,25 +52,127 @@ pub struct MultiSetEqualityProof {
     pub commitments: Commitments,
 }
 
-impl MultiSetEqualityProof {
+impl EqualityProof {
+    pub fn prove(
+        f: MultiSet,
+        t: MultiSet,
+        proving_key: &Powers<Bls12_381>,
+        transcript: &mut dyn TranscriptProtocol,
+    ) -> EqualityProof {
+        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(t.len()).unwrap();
+        // Convert witness and table to polynomials
+        let f_poly = f.to_polynomial(&domain);
+        let f_commit = kzg10::commit(proving_key, &f_poly);
+        let t_poly = t.to_polynomial(&domain);
+        // Compute h_1 and h_2
+        let (h_1, h_2) = multiset_equality::compute_h1_h2(&f, &t);
+        // Convert h_1 and h_2 to polynomials
+        let h_1_poly = h_1.to_polynomial(&domain);
+        let h_2_poly = h_2.to_polynomial(&domain);
+        // Commit to h_1(X) and h_2(X)
+        let h_1_commit = kzg10::commit(proving_key, &h_1_poly);
+        let h_2_commit = kzg10::commit(proving_key, &h_2_poly);
+        // Add commitments to transcript
+        transcript.append_commitment(b"h_1_poly", &h_1_commit);
+        transcript.append_commitment(b"h_2_poly", &h_2_commit);
+        let beta = transcript.challenge_scalar(b"beta");
+        let gamma = transcript.challenge_scalar(b"gamma");
+        // Compute Z(X)
+        let z_evaluations =
+            multiset_equality::compute_accumulator_values(&f, &t, &h_1, &h_2, beta, gamma);
+        let z_poly = Polynomial::from_coefficients_vec(domain.ifft(&z_evaluations));
+        // Commit to Z(X)
+        let z_commit = kzg10::commit(proving_key, &z_poly);
+        transcript.append_commitment(b"accumulator_poly", &z_commit);
+        // Compute quotient polynomial
+        let (quotient_poly, _) = quotient_poly::compute(
+            &domain, &z_poly, &f_poly, &t_poly, &h_1_poly, &h_2_poly, beta, gamma,
+        );
+        // Commit to quotient polynomial
+        let q_commit = kzg10::commit(proving_key, &quotient_poly);
+        transcript.append_commitment(b"quotient_poly", &q_commit);
+        // Compute the Witness that f was a subset of t
+        //
+        let evaluation_challenge = transcript.challenge_scalar(b"evaluation_challenge");
+        transcript.append_scalar(b"evaluation_challenge", &evaluation_challenge);
+        let evaluation_omega = evaluation_challenge * domain.group_gen;
+        // Compute evaluations at `z`
+        let f_eval = f_poly.evaluate(evaluation_challenge);
+        let t_eval = t_poly.evaluate(evaluation_challenge);
+        let h_1_eval = h_1_poly.evaluate(evaluation_challenge);
+        let h_2_eval = h_2_poly.evaluate(evaluation_challenge);
+        let z_eval = z_poly.evaluate(evaluation_challenge);
+        let q_eval = quotient_poly.evaluate(evaluation_challenge);
+        // Compute evaluations at `z * omega`
+        let t_omega_eval = t_poly.evaluate(evaluation_omega);
+        let h_1_omega_eval = h_1_poly.evaluate(evaluation_omega);
+        let h_2_omega_eval = h_2_poly.evaluate(evaluation_omega);
+        let z_omega_eval = z_poly.evaluate(evaluation_omega);
+        transcript.append_scalar(b"f_eval", &f_eval);
+        transcript.append_scalar(b"t_eval", &t_eval);
+        transcript.append_scalar(b"h_1_eval", &h_1_eval);
+        transcript.append_scalar(b"h_2_eval", &h_2_eval);
+        transcript.append_scalar(b"z_eval", &z_eval);
+        transcript.append_scalar(b"q_eval", &q_eval);
+        transcript.append_scalar(b"t_omega_eval", &t_omega_eval);
+        transcript.append_scalar(b"h_1_omega_eval", &h_1_omega_eval);
+        transcript.append_scalar(b"h_2_omega_eval", &h_2_omega_eval);
+        transcript.append_scalar(b"z_omega_eval", &z_omega_eval);
+        let aggregation_challenge = transcript.challenge_scalar(b"witness_aggregation");
+        // Compute opening proof for f(X) evaluated at `z`
+        let agg_witness = kzg10::compute_aggregate_witness(
+            vec![
+                &f_poly,
+                &t_poly,
+                &h_1_poly,
+                &h_2_poly,
+                &z_poly,
+                &quotient_poly,
+            ],
+            evaluation_challenge,
+            aggregation_challenge,
+        );
+        let agg_witness_comm = kzg10::commit(proving_key, &agg_witness);
+        // Compute opening proofs for f(X) evaluated at `z * omega`
+        let shifted_agg_witness = kzg10::compute_aggregate_witness(
+            vec![&t_poly, &h_1_poly, &h_2_poly, &z_poly],
+            evaluation_omega,
+            aggregation_challenge,
+        );
+        let shifted_agg_witness_comm = kzg10::commit(proving_key, &shifted_agg_witness);
+        EqualityProof {
+            evaluations: Evaluations {
+                f: f_eval,
+                t: t_eval,
+                t_omega: t_omega_eval,
+                h_1: h_1_eval,
+                h_1_omega: h_1_omega_eval,
+                h_2: h_2_eval,
+                h_2_omega: h_2_omega_eval,
+                z: z_eval,
+                z_omega: z_omega_eval,
+            },
+            commitments: Commitments {
+                f: f_commit,
+                q: q_commit,
+                h_1: h_1_commit,
+                h_2: h_2_commit,
+                z: z_commit,
+            },
+            aggregate_witness_comm: agg_witness_comm,
+            shifted_aggregate_witness_comm: shifted_agg_witness_comm,
+        }
+    }
+
     pub fn verify(
         &self,
+        n: usize,
         verification_key: &VerifierKey<Bls12_381>,
-        preprocessed_table: &PreProcessedTable,
+        commitment_to_t: Commitment<Bls12_381>,
         transcript: &mut dyn TranscriptProtocol,
     ) -> bool {
-        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(preprocessed_table.n).unwrap();
+        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(n).unwrap();
 
-        let alpha = transcript.challenge_scalar(b"alpha");
-        let merged_table_commit = kzg10::aggregate_commitments(
-            vec![
-                &preprocessed_table.t_1.1,
-                &preprocessed_table.t_2.1,
-                &preprocessed_table.t_3.1,
-            ],
-            alpha,
-        );
-        transcript.append_scalar(b"alpha", &alpha);
         transcript.append_commitment(b"h_1_poly", &self.commitments.h_1);
         transcript.append_commitment(b"h_2_poly", &self.commitments.h_2);
         let beta = transcript.challenge_scalar(b"beta");
@@ -103,7 +204,7 @@ impl MultiSetEqualityProof {
         let agg_commitment = kzg10::aggregate_commitments(
             vec![
                 &self.commitments.f,
-                &merged_table_commit,
+                &commitment_to_t,
                 &self.commitments.h_1,
                 &self.commitments.h_2,
                 &self.commitments.z,
@@ -126,7 +227,7 @@ impl MultiSetEqualityProof {
         // Create aggregate opening proof for all polynomials evaluated at the shifted evaluation challenge `z * omega`
         let shifted_agg_commitment = kzg10::aggregate_commitments(
             vec![
-                &merged_table_commit,
+                &commitment_to_t,
                 &self.commitments.h_1,
                 &self.commitments.h_2,
                 &self.commitments.z,
