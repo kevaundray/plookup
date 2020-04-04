@@ -4,6 +4,10 @@ use ff_fft::{DensePolynomial as Polynomial, EvaluationDomain};
 use poly_commit::kzg10::{Commitment, Powers};
 use std::collections::HashMap;
 
+pub mod four_bits;
+pub mod generic;
+pub use generic::Generic;
+
 pub struct PreProcessedTable {
     pub n: usize,
     pub t_1: (MultiSet, Commitment<Bls12_381>, Polynomial<Fr>),
@@ -12,9 +16,6 @@ pub struct PreProcessedTable {
 }
 
 pub trait LookUpTable {
-    /// Creates a new lookup table with its entries populated
-    fn new() -> Self;
-
     /// Returns the number of entries in the lookup table
     fn len(&self) -> usize {
         self.borrow_map().keys().len()
@@ -91,57 +92,4 @@ pub trait LookUpTable {
             t_3: (t_3, t_3_commit, t_3_poly),
         }
     }
-}
-
-pub struct XOR4BitTable(HashMap<(Fr, Fr), Fr>);
-
-impl LookUpTable for XOR4BitTable {
-    // Initialise all 4 bit combinations of XOR
-    fn new() -> Self {
-        let mut table = XOR4BitTable(HashMap::new());
-
-        for i in 0..=15 {
-            for k in 0..=15 {
-                let result = i ^ k;
-                table.0.insert(
-                    (Fr::from(i as u8), Fr::from(k as u8)),
-                    Fr::from(result as u8),
-                );
-            }
-        }
-        table
-    }
-
-    fn borrow_map(&self) -> &HashMap<(Fr, Fr), Fr> {
-        &self.0
-    }
-}
-pub struct Add4BitTable(HashMap<(Fr, Fr), Fr>);
-
-impl LookUpTable for Add4BitTable {
-    // Initialise all 4 bit combinations of Ad
-    fn new() -> Self {
-        let mut table = Add4BitTable(HashMap::new());
-
-        for i in 0..=15 {
-            for k in 0..=15 {
-                let result = i + k;
-                table.0.insert(
-                    (Fr::from(i as u8), Fr::from(k as u8)),
-                    Fr::from(result as u8),
-                );
-            }
-        }
-        table
-    }
-
-    fn borrow_map(&self) -> &HashMap<(Fr, Fr), Fr> {
-        &self.0
-    }
-}
-
-#[test]
-fn test_size_bit_table() {
-    let four_bit_table = XOR4BitTable::new();
-    assert_eq!(four_bit_table.0.len(), 2usize.pow(8))
 }

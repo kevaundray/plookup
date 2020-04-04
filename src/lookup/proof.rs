@@ -1,4 +1,4 @@
-use super::lookup_table::PreProcessedTable;
+use super::table::PreProcessedTable;
 use crate::{
     kzg10,
     multiset::{EqualityProof, MultiSet},

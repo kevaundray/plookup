@@ -1,10 +1,11 @@
 use super::{
-    lookup_table::{LookUpTable, PreProcessedTable},
     proof::LookUpProof,
+    table::{LookUpTable, PreProcessedTable},
 };
 use crate::{multiset::MultiSet, transcript::TranscriptProtocol};
 use algebra::{bls12_381::Fr, Bls12_381};
 use poly_commit::kzg10::Powers;
+
 pub struct LookUp<T: LookUpTable> {
     table: T,
     // This is the set of values which we want to prove is a subset of the
@@ -63,7 +64,7 @@ impl<T: LookUpTable> LookUp<T> {
 mod test {
     use super::*;
     use crate::kzg10;
-    use crate::lookup::lookup_table::XOR4BitTable;
+    use crate::lookup::table::four_bits::XOR4Bit;
     use merlin::Transcript;
 
     #[test]
@@ -72,7 +73,7 @@ mod test {
         let (proving_key, verifier_key) = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
 
         // Setup Lookup with a 4 bit table
-        let table = XOR4BitTable::new();
+        let table = XOR4Bit::new();
         let preprocessed_table = table.preprocess(&proving_key, 2usize.pow(8));
 
         let mut lookup = LookUp::new(table);

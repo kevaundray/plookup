@@ -95,7 +95,7 @@ fn compute_interval_check(
     i_poly
 }
 
-fn compute_term_check(
+pub fn compute_term_check(
     domain: &EvaluationDomain<Fr>,
     z_poly: &Polynomial<Fr>,
     f_poly: &Polynomial<Fr>,
@@ -117,7 +117,7 @@ fn compute_term_check(
     &part_a - &part_b
 }
 // This computes the grand product term for Z(X) or F(\beta, \gamma)
-pub fn compute_term_check_a(
+fn compute_term_check_a(
     domain: &EvaluationDomain<Fr>,
     z_poly: &Polynomial<Fr>,
     f_poly: &Polynomial<Fr>,
@@ -251,7 +251,7 @@ fn compute_term_check_b(
 // Easiest way is to compute the evaluation points, which will be zero at every position except for n
 // Then IFFT to get the coefficient form
 // Note: n=0 is the first lagrange polynomial and n = domain.size() -1 is the last lagrange polynomial
-fn compute_n_lagrange_poly(domain: &EvaluationDomain<Fr>, n: usize) -> Polynomial<Fr> {
+pub fn compute_n_lagrange_poly(domain: &EvaluationDomain<Fr>, n: usize) -> Polynomial<Fr> {
     assert!(n <= domain.size() - 1);
     let mut evaluations = compute_n_lagrange_evaluations(domain.size(), n);
     domain.ifft_in_place(&mut evaluations);
