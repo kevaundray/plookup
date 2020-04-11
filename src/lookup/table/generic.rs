@@ -26,7 +26,7 @@ impl Generic {
         table
     }
     // Initialise a table by passing all of its entries to the table
-    fn with_hashmap(map: HashMap<(Fr, Fr), Fr>) -> Self {
+    pub fn with_hashmap(map: HashMap<(Fr, Fr), Fr>) -> Self {
         Generic(map)
     }
 }
