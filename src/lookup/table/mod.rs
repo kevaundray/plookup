@@ -1,6 +1,9 @@
 use crate::{kzg10, multiset::MultiSet};
 use ark_bls12_381::{Bls12_381, Fr};
-use ark_poly::{polynomial::univariate::DensePolynomial as Polynomial, EvaluationDomain, UVPolynomial, Radix2EvaluationDomain};
+use ark_poly::{
+    polynomial::univariate::DensePolynomial as Polynomial, EvaluationDomain,
+    Radix2EvaluationDomain, UVPolynomial,
+};
 use ark_poly_commit::kzg10::{Commitment, Powers};
 use std::collections::HashMap;
 

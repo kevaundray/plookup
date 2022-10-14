@@ -1,6 +1,8 @@
 use ark_bls12_381::Fr;
 use ark_ff::{One, Zero};
-use ark_poly::{polynomial::univariate::DensePolynomial as Polynomial, EvaluationDomain, UVPolynomial};
+use ark_poly::{
+    polynomial::univariate::DensePolynomial as Polynomial, EvaluationDomain, UVPolynomial,
+};
 use std::ops::{Add, Mul};
 /// A MultiSet is a variation of a set, where we allow duplicate members
 /// This can be emulated in Rust by using vectors
@@ -101,7 +103,7 @@ impl MultiSet {
     /// Treats each element in the multiset as evaluation points
     /// Computes IFFT of the set of evaluation points
     /// and returns the coefficients as a Polynomial data structure
-    pub fn to_polynomial<E :EvaluationDomain<Fr>>(&self, domain: &E) -> Polynomial<Fr> {
+    pub fn to_polynomial<E: EvaluationDomain<Fr>>(&self, domain: &E) -> Polynomial<Fr> {
         Polynomial::from_coefficients_vec(domain.ifft(&self.0))
     }
     /// Aggregates multisets together using a random challenge
@@ -160,6 +162,8 @@ impl Mul<Fr> for &MultiSet {
 }
 #[cfg(test)]
 mod test {
+    use ark_poly::{Polynomial, Radix2EvaluationDomain};
+
     use super::*;
     #[test]
     fn test_concatenate() {
@@ -226,7 +230,6 @@ mod test {
 
     #[test]
     fn test_to_polynomial() {
-
         let mut a = MultiSet::new();
         a.push(Fr::from(1u8));
         a.push(Fr::from(2u8));
@@ -236,7 +239,7 @@ mod test {
         a.push(Fr::from(6u8));
         a.push(Fr::from(7u8));
 
-        let domain = EvaluationDomain::new(a.len() + 1).unwrap();
+        let domain: Radix2EvaluationDomain<Fr> = EvaluationDomain::new(a.len() + 1).unwrap();
         let a_poly = a.to_polynomial(&domain);
 
         assert_eq!(a_poly.degree(), 7)

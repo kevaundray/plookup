@@ -1,6 +1,9 @@
 use ark_bls12_381::Fr;
 use ark_ff::{One, Zero};
-use ark_poly::{polynomial::univariate::DensePolynomial as Polynomial, EvaluationDomain, UVPolynomial, Polynomial as poly};
+use ark_poly::{
+    polynomial::univariate::DensePolynomial as Polynomial, EvaluationDomain, Polynomial as poly,
+    UVPolynomial,
+};
 // The quotient polynomial will encode the four checks for the multiset equality argument
 // These checks are:
 // 1) Z(X) evaluated at the first root of unity is 1
@@ -191,7 +194,7 @@ fn compute_term_check_b<E: EvaluationDomain<Fr>>(
     gamma: Fr,
 ) -> Polynomial<Fr> {
     // Increase the domain size by 4
-    let domain_4n: &E= &EvaluationDomain::new(4 * domain.size()).unwrap();
+    let domain_4n: &E = &EvaluationDomain::new(4 * domain.size()).unwrap();
 
     // Convert all polynomials into evaluation form, then add four terms to each evaluation as we need to compute their evaluations at the next root of unity
     let mut z_evals = domain_4n.fft(z_poly);
@@ -267,6 +270,8 @@ fn compute_n_lagrange_evaluations(domain_size: usize, n: usize) -> Vec<Fr> {
 }
 #[cfg(test)]
 mod test {
+    use ark_poly::Radix2EvaluationDomain;
+
     use super::*;
     use crate::multiset::{multiset_equality::*, MultiSet};
     #[test]
@@ -285,7 +290,7 @@ mod test {
         t.push(Fr::from(5u8));
 
         // Setup domain
-        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(f.len()).unwrap();
+        let domain: Radix2EvaluationDomain<Fr> = EvaluationDomain::new(f.len()).unwrap();
         let beta = Fr::from(10u8);
         let gamma = Fr::from(11u8);
 

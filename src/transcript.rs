@@ -25,7 +25,6 @@ impl TranscriptProtocol for Transcript {
     }
 
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Fr {
-
         let mut buf = [0u8; 32];
         self.challenge_bytes(label, &mut buf);
 

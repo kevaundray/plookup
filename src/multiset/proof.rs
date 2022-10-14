@@ -3,8 +3,11 @@ use crate::{
     multiset::{multiset_equality, quotient_poly, MultiSet},
     transcript::TranscriptProtocol,
 };
-use ark_bls12_381::{Fr, Bls12_381};
-use  ark_poly::{polynomial::univariate::DensePolynomial as Polynomial, EvaluationDomain, Radix2EvaluationDomain, Polynomial as Poly, UVPolynomial};
+use ark_bls12_381::{Bls12_381, Fr};
+use ark_poly::{
+    polynomial::univariate::DensePolynomial as Polynomial, EvaluationDomain, Polynomial as Poly,
+    Radix2EvaluationDomain, UVPolynomial,
+};
 use ark_poly_commit::kzg10::{Commitment, Powers, VerifierKey};
 // Evaluations store the evaluations of different polynomial.
 // `t` denotes that the polynomial was evaluated at t(z) for some random evaluation challenge `z`
@@ -259,7 +262,7 @@ impl EqualityProof {
         ok
     }
     /// Computes the quotient evaluation from the prover messages
-    fn compute_quotient_evaluation<E :EvaluationDomain<Fr>>(
+    fn compute_quotient_evaluation<E: EvaluationDomain<Fr>>(
         &self,
         beta: &Fr,
         gamma: &Fr,

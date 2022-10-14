@@ -1,15 +1,13 @@
 use ark_bls12_381::{Bls12_381, Fr, G1Projective};
 use ark_ec::AffineCurve;
-use ark_poly_commit::kzg10::{Commitment, Powers, UniversalParams, VerifierKey, KZG10, Proof};
 use ark_poly::{polynomial::univariate::DensePolynomial as Polynomial, UVPolynomial};
+use ark_poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, VerifierKey, KZG10};
 use ark_std::test_rng;
 use num_traits::identities::Zero;
 
 type KzgBls12_381 = KZG10<Bls12_381, Polynomial<Fr>>;
 
-pub fn trusted_setup<'a>(
-    max_deg: usize,
-) -> (Powers<'a, Bls12_381>, VerifierKey<Bls12_381>) {
+pub fn trusted_setup<'a>(max_deg: usize) -> (Powers<'a, Bls12_381>, VerifierKey<Bls12_381>) {
     let mut rng = test_rng();
     let pp = KzgBls12_381::setup(max_deg, false, &mut rng).unwrap();
     trim(&pp, max_deg)
@@ -24,8 +22,8 @@ fn trim<'a>(
     }
     let powers_of_g = pp.powers_of_g[..=supported_degree].to_vec();
     let powers_of_gamma_g = (0..=supported_degree)
-    .map(|i| pp.powers_of_gamma_g[&i])
-    .collect();
+        .map(|i| pp.powers_of_gamma_g[&i])
+        .collect();
 
     let powers = Powers {
         powers_of_g: std::borrow::Cow::Owned(powers_of_g),
