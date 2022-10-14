@@ -1,5 +1,5 @@
 use crate::multiset::MultiSet;
-use algebra::bls12_381::Fr;
+use ark_bls12_381::Fr;
 use num_traits::identities::One;
 
 /// Computes the multisets h_1 and h_2
@@ -88,7 +88,7 @@ pub fn compute_accumulator_values(
 #[cfg(test)]
 mod test {
     use super::*;
-    use ff_fft::{DensePolynomial as Polynomial, EvaluationDomain};
+    use  ark_poly::{polynomial::univariate::DensePolynomial as Polynomial, EvaluationDomain, Polynomial as Poly, UVPolynomial};
 
     #[test]
     fn test_manually_compute_z() {

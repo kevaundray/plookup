@@ -1,5 +1,6 @@
+use ark_bls12_381::Fr;
+
 use super::{Generic, LookUpTable};
-use algebra::bls12_381::Fr;
 use std::collections::HashMap;
 
 const BIT_RANGE: usize = 16;

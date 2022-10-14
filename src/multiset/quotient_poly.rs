@@ -1,6 +1,6 @@
-use algebra::bls12_381::Fr;
-use ff_fft::{DensePolynomial as Polynomial, EvaluationDomain};
-use num_traits::identities::{One, Zero};
+use ark_bls12_381::Fr;
+use ark_ff::{One, Zero};
+use ark_poly::{polynomial::univariate::DensePolynomial as Polynomial, EvaluationDomain, UVPolynomial, Polynomial as poly};
 // The quotient polynomial will encode the four checks for the multiset equality argument
 // These checks are:
 // 1) Z(X) evaluated at the first root of unity is 1
@@ -22,8 +22,8 @@ use num_traits::identities::{One, Zero};
 // So the degree of the quotient polynomial Q(x) is 3n - n = 2n
 // Significance: Adding this protocol into PLONK will not "blow up" the degree of the quotient polynomial
 // Where "blow up" denotes increasing the overall degree past 4n for standard plonk
-pub fn compute(
-    domain: &EvaluationDomain<Fr>,
+pub fn compute<E: EvaluationDomain<Fr>>(
+    domain: &E,
     z_poly: &Polynomial<Fr>,
     f_poly: &Polynomial<Fr>,
     t_poly: &Polynomial<Fr>,
@@ -46,7 +46,10 @@ pub fn compute(
     sum.divide_by_vanishing_poly(*domain).unwrap()
 }
 
-fn compute_point_checks(z_poly: &Polynomial<Fr>, domain: &EvaluationDomain<Fr>) -> Polynomial<Fr> {
+fn compute_point_checks<E: EvaluationDomain<Fr>>(
+    z_poly: &Polynomial<Fr>,
+    domain: &E,
+) -> Polynomial<Fr> {
     // Compute lagrange polynomials
     let l1_poly = compute_n_lagrange_poly(domain, 0);
     let ln_poly = compute_n_lagrange_poly(domain, domain.size() - 1);
@@ -60,13 +63,13 @@ fn compute_point_checks(z_poly: &Polynomial<Fr>, domain: &EvaluationDomain<Fr>) 
     &z_prime_poly * &l_poly
 }
 
-fn compute_interval_check(
+fn compute_interval_check<E: EvaluationDomain<Fr>>(
     h_1_poly: &Polynomial<Fr>,
     h_2_poly: &Polynomial<Fr>,
-    domain: &EvaluationDomain<Fr>,
+    domain: &E,
 ) -> Polynomial<Fr> {
     // Increase domain size by two
-    let domain_2n: EvaluationDomain<Fr> = EvaluationDomain::new(2 * domain.size()).unwrap();
+    let domain_2n: E = EvaluationDomain::new(2 * domain.size()).unwrap();
 
     // Compute last lagrange polynomial in evaluation form
     let ln_evals = compute_n_lagrange_evaluations(domain.size(), domain.size() - 1);
@@ -95,8 +98,8 @@ fn compute_interval_check(
     i_poly
 }
 
-pub fn compute_term_check(
-    domain: &EvaluationDomain<Fr>,
+pub fn compute_term_check<E: EvaluationDomain<Fr>>(
+    domain: &E,
     z_poly: &Polynomial<Fr>,
     f_poly: &Polynomial<Fr>,
     t_poly: &Polynomial<Fr>,
@@ -117,8 +120,8 @@ pub fn compute_term_check(
     &part_a - &part_b
 }
 // This computes the grand product term for Z(X) or F(\beta, \gamma)
-fn compute_term_check_a(
-    domain: &EvaluationDomain<Fr>,
+fn compute_term_check_a<E: EvaluationDomain<Fr>>(
+    domain: &E,
     z_poly: &Polynomial<Fr>,
     f_poly: &Polynomial<Fr>,
     t_poly: &Polynomial<Fr>,
@@ -126,7 +129,7 @@ fn compute_term_check_a(
     gamma: Fr,
 ) -> Polynomial<Fr> {
     // Increase the domain size by 4
-    let domain_4n: &EvaluationDomain<Fr> = &EvaluationDomain::new(4 * domain.size()).unwrap();
+    let domain_4n: &E = &EvaluationDomain::new(4 * domain.size()).unwrap();
 
     // Convert all polynomials into evaluation form
     let z_evals = domain_4n.fft(&z_poly);
@@ -172,15 +175,15 @@ fn compute_term_check_a(
     let i_poly = Polynomial::from_coefficients_vec(domain_4n.ifft(&i_evals));
 
     assert_eq!(
-        i_poly.evaluate(domain.elements().last().unwrap()),
+        i_poly.evaluate(&domain.elements().last().unwrap()),
         Fr::zero()
     );
 
     i_poly
 }
 // This computes the grand product term for Z(Xg) or G(\beta, \gamma)
-fn compute_term_check_b(
-    domain: &EvaluationDomain<Fr>,
+fn compute_term_check_b<E: EvaluationDomain<Fr>>(
+    domain: &E,
     z_poly: &Polynomial<Fr>,
     h_1_poly: &Polynomial<Fr>,
     h_2_poly: &Polynomial<Fr>,
@@ -188,7 +191,7 @@ fn compute_term_check_b(
     gamma: Fr,
 ) -> Polynomial<Fr> {
     // Increase the domain size by 4
-    let domain_4n: &EvaluationDomain<Fr> = &EvaluationDomain::new(4 * domain.size()).unwrap();
+    let domain_4n: &E= &EvaluationDomain::new(4 * domain.size()).unwrap();
 
     // Convert all polynomials into evaluation form, then add four terms to each evaluation as we need to compute their evaluations at the next root of unity
     let mut z_evals = domain_4n.fft(z_poly);
@@ -240,7 +243,7 @@ fn compute_term_check_b(
     let i_poly = Polynomial::from_coefficients_vec(domain_4n.ifft(&i_evals));
 
     assert_eq!(
-        i_poly.evaluate(domain.elements().last().unwrap()),
+        i_poly.evaluate(&domain.elements().last().unwrap()),
         Fr::zero()
     );
 
@@ -251,7 +254,7 @@ fn compute_term_check_b(
 // Easiest way is to compute the evaluation points, which will be zero at every position except for n
 // Then IFFT to get the coefficient form
 // Note: n=0 is the first lagrange polynomial and n = domain.size() -1 is the last lagrange polynomial
-pub fn compute_n_lagrange_poly(domain: &EvaluationDomain<Fr>, n: usize) -> Polynomial<Fr> {
+pub fn compute_n_lagrange_poly<E: EvaluationDomain<Fr>>(domain: &E, n: usize) -> Polynomial<Fr> {
     assert!(n <= domain.size() - 1);
     let mut evaluations = compute_n_lagrange_evaluations(domain.size(), n);
     domain.ifft_in_place(&mut evaluations);

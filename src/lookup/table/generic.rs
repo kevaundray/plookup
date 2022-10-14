@@ -1,5 +1,6 @@
 use crate::lookup::table::LookUpTable;
-use algebra::bls12_381::Fr;
+use ark_bls12_381::Fr;
+
 use std::collections::HashMap;
 
 /// Construct a Generic lookup table over a bi-variate function
