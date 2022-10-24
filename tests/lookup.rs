@@ -1,6 +1,6 @@
 extern crate plookup;
-use algebra::bls12_381::Fr;
 
+use ark_bls12_381::Fr;
 use merlin::Transcript;
 use plookup::kzg10::trusted_setup;
 use plookup::lookup::{
@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 #[test]
 fn test_xor_four_bit_lookup() {
-    let (prover_key, verifier_key) = trusted_setup(2usize.pow(10), b"insecure_seeding_setup");
+    let (prover_key, verifier_key) = trusted_setup(2usize.pow(10));
 
     // Setup Lookup with a 4 bit table
     let table = XOR4Bit::new();
@@ -35,7 +35,7 @@ fn test_xor_four_bit_lookup() {
 
 #[test]
 fn test_inefficient_range_lookups() {
-    let (prover_key, verifier_key) = trusted_setup(2usize.pow(10), b"insecure_seeding_setup");
+    let (prover_key, verifier_key) = trusted_setup(2usize.pow(10));
 
     // Setup a 8-bit range protocol using Lookup API
     let mut hashmap: HashMap<(Fr, Fr), Fr> = HashMap::new();
@@ -71,7 +71,7 @@ fn test_inefficient_range_lookups() {
 
 #[test]
 fn test_mul_four_bit_lookup() {
-    let (prover_key, verifier_key) = trusted_setup(2usize.pow(10), b"insecure_seeding_setup");
+    let (prover_key, verifier_key) = trusted_setup(2usize.pow(10));
 
     // 4-bit multiplication lookup table
     let table = Generic::with_fn(

@@ -1,29 +1,16 @@
-use algebra::bls12_381::{Fr, G1Projective};
-use algebra::Bls12_381;
-use algebra_core::curves::AffineCurve;
-use ff_fft::DensePolynomial as Polynomial;
+use ark_bls12_381::{Bls12_381, Fr, G1Projective};
+use ark_ec::AffineCurve;
+use ark_poly::{polynomial::univariate::DensePolynomial as Polynomial, UVPolynomial};
+use ark_poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, VerifierKey, KZG10};
+use ark_std::test_rng;
 use num_traits::identities::Zero;
-use poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, VerifierKey, KZG10};
-use rand_chacha::ChaChaRng;
-use rand_core::SeedableRng;
-// Modification of https://github.com/scipr-lab/poly-commit/blob/master/src/kzg10/mod.rs
-type KzgBls12_381 = KZG10<Bls12_381>;
 
-pub fn trusted_setup<'a>(
-    max_deg: usize,
-    seed: &[u8],
-) -> (Powers<'a, Bls12_381>, VerifierKey<Bls12_381>) {
-    let mut rng = ChaChaRng::from_seed(to_32_bytes(seed));
+type KzgBls12_381 = KZG10<Bls12_381, Polynomial<Fr>>;
+
+pub fn trusted_setup<'a>(max_deg: usize) -> (Powers<'a, Bls12_381>, VerifierKey<Bls12_381>) {
+    let mut rng = test_rng();
     let pp = KzgBls12_381::setup(max_deg, false, &mut rng).unwrap();
     trim(&pp, max_deg)
-}
-
-fn to_32_bytes(bytes: &[u8]) -> [u8; 32] {
-    let mut array: [u8; 32] = [0; 32];
-    for (a, b) in bytes.iter().zip(array.iter_mut()) {
-        *b = *a
-    }
-    array
 }
 
 fn trim<'a>(
@@ -34,7 +21,9 @@ fn trim<'a>(
         supported_degree += 1;
     }
     let powers_of_g = pp.powers_of_g[..=supported_degree].to_vec();
-    let powers_of_gamma_g = pp.powers_of_gamma_g[..=supported_degree].to_vec();
+    let powers_of_gamma_g = (0..=supported_degree)
+        .map(|i| pp.powers_of_gamma_g[&i])
+        .collect();
 
     let powers = Powers {
         powers_of_g: std::borrow::Cow::Owned(powers_of_g),
@@ -42,7 +31,7 @@ fn trim<'a>(
     };
     let vk = VerifierKey {
         g: pp.powers_of_g[0],
-        gamma_g: pp.powers_of_gamma_g[0],
+        gamma_g: pp.powers_of_gamma_g[&0],
         h: pp.h,
         beta_h: pp.beta_h,
         prepared_h: pp.prepared_h.clone(),
@@ -53,7 +42,7 @@ fn trim<'a>(
 
 pub fn commit(powers: &Powers<Bls12_381>, p: &Polynomial<Fr>) -> Commitment<Bls12_381> {
     let hiding_bound = None;
-    let (comm, _) = KZG10::commit(&powers, &p, hiding_bound, None).unwrap();
+    let (comm, _) = KZG10::commit(&powers, p, hiding_bound, None).unwrap();
     comm
 }
 
@@ -127,7 +116,7 @@ pub fn verify(
 ) -> bool {
     let proof = Proof {
         w: commitment_to_witness.0,
-        random_v: Fr::from(0u8),
+        random_v: Some(Fr::zero()),
     };
 
     KzgBls12_381::check(vk, commitment_to_poly, evaluation_point, value, &proof).unwrap()
@@ -144,7 +133,7 @@ pub fn batch_verify(
     for witness in commitment_to_witnesses {
         let proof = Proof {
             w: witness.0,
-            random_v: Fr::zero(),
+            random_v: Some(Fr::zero()),
         };
         proofs.push(proof);
     }
@@ -155,7 +144,7 @@ pub fn batch_verify(
         &evaluation_points,
         &values,
         &proofs,
-        &mut rand::thread_rng(),
+        &mut test_rng(),
     )
     .unwrap()
 }

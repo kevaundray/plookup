@@ -3,9 +3,12 @@ use crate::{
     multiset::{multiset_equality, quotient_poly, MultiSet},
     transcript::TranscriptProtocol,
 };
-use algebra::{bls12_381::Fr, Bls12_381};
-use ff_fft::{DensePolynomial as Polynomial, EvaluationDomain};
-use poly_commit::kzg10::{Commitment, Powers, VerifierKey};
+use ark_bls12_381::{Bls12_381, Fr};
+use ark_poly::{
+    polynomial::univariate::DensePolynomial as Polynomial, EvaluationDomain, Polynomial as Poly,
+    Radix2EvaluationDomain, UVPolynomial,
+};
+use ark_poly_commit::kzg10::{Commitment, Powers, VerifierKey};
 // Evaluations store the evaluations of different polynomial.
 // `t` denotes that the polynomial was evaluated at t(z) for some random evaluation challenge `z`
 // `t_omega` denotes the polynomial was evaluated at t(z * omega) where omega is the group generator
@@ -59,7 +62,7 @@ impl EqualityProof {
         proving_key: &Powers<Bls12_381>,
         transcript: &mut dyn TranscriptProtocol,
     ) -> EqualityProof {
-        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(t.len()).unwrap();
+        let domain: Radix2EvaluationDomain<Fr> = EvaluationDomain::new(t.len()).unwrap();
         // Convert witness and table to polynomials
         let f_poly = f.to_polynomial(&domain);
         let f_commit = kzg10::commit(proving_key, &f_poly);
@@ -97,17 +100,17 @@ impl EqualityProof {
         transcript.append_scalar(b"evaluation_challenge", &evaluation_challenge);
         let evaluation_omega = evaluation_challenge * domain.group_gen;
         // Compute evaluations at `z`
-        let f_eval = f_poly.evaluate(evaluation_challenge);
-        let t_eval = t_poly.evaluate(evaluation_challenge);
-        let h_1_eval = h_1_poly.evaluate(evaluation_challenge);
-        let h_2_eval = h_2_poly.evaluate(evaluation_challenge);
-        let z_eval = z_poly.evaluate(evaluation_challenge);
-        let q_eval = quotient_poly.evaluate(evaluation_challenge);
+        let f_eval = f_poly.evaluate(&evaluation_challenge);
+        let t_eval = t_poly.evaluate(&evaluation_challenge);
+        let h_1_eval = h_1_poly.evaluate(&evaluation_challenge);
+        let h_2_eval = h_2_poly.evaluate(&evaluation_challenge);
+        let z_eval = z_poly.evaluate(&evaluation_challenge);
+        let q_eval = quotient_poly.evaluate(&evaluation_challenge);
         // Compute evaluations at `z * omega`
-        let t_omega_eval = t_poly.evaluate(evaluation_omega);
-        let h_1_omega_eval = h_1_poly.evaluate(evaluation_omega);
-        let h_2_omega_eval = h_2_poly.evaluate(evaluation_omega);
-        let z_omega_eval = z_poly.evaluate(evaluation_omega);
+        let t_omega_eval = t_poly.evaluate(&evaluation_omega);
+        let h_1_omega_eval = h_1_poly.evaluate(&evaluation_omega);
+        let h_2_omega_eval = h_2_poly.evaluate(&evaluation_omega);
+        let z_omega_eval = z_poly.evaluate(&evaluation_omega);
         transcript.append_scalar(b"f_eval", &f_eval);
         transcript.append_scalar(b"t_eval", &t_eval);
         transcript.append_scalar(b"h_1_eval", &h_1_eval);
@@ -171,7 +174,7 @@ impl EqualityProof {
         commitment_to_t: Commitment<Bls12_381>,
         transcript: &mut dyn TranscriptProtocol,
     ) -> bool {
-        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(n).unwrap();
+        let domain: Radix2EvaluationDomain<Fr> = EvaluationDomain::new(n).unwrap();
 
         transcript.append_commitment(b"h_1_poly", &self.commitments.h_1);
         transcript.append_commitment(b"h_2_poly", &self.commitments.h_2);
@@ -259,12 +262,12 @@ impl EqualityProof {
         ok
     }
     /// Computes the quotient evaluation from the prover messages
-    fn compute_quotient_evaluation(
+    fn compute_quotient_evaluation<E: EvaluationDomain<Fr>>(
         &self,
         beta: &Fr,
         gamma: &Fr,
         evaluation_challenge: &Fr,
-        domain: &EvaluationDomain<Fr>,
+        domain: &E,
     ) -> Fr {
         // g^{n+1}
         let last_element = domain.elements().last().unwrap();

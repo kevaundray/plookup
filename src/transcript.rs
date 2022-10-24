@@ -1,8 +1,8 @@
-use algebra::bls12_381::Fr;
-use algebra::Bls12_381;
-use algebra::{to_bytes, ToBytes};
+use ark_bls12_381::{Bls12_381, Fr};
+use ark_ff::{to_bytes, UniformRand};
+use ark_poly_commit::kzg10::Commitment;
+use ark_std::test_rng;
 use merlin::Transcript;
-use poly_commit::kzg10::Commitment;
 
 pub trait TranscriptProtocol {
     /// Append a `commitment` with the given `label`.
@@ -25,14 +25,10 @@ impl TranscriptProtocol for Transcript {
     }
 
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Fr {
-        use algebra::UniformRand;
-        use rand_chacha::ChaChaRng;
-        use rand_core::SeedableRng;
-
         let mut buf = [0u8; 32];
         self.challenge_bytes(label, &mut buf);
 
-        let mut rng = &mut self.build_rng().finalize(&mut ChaChaRng::from_seed(buf));
+        let mut rng = test_rng();
         Fr::rand(&mut rng)
     }
 }

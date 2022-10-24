@@ -1,10 +1,11 @@
+use ark_bls12_381::{Bls12_381, Fr};
+use ark_poly_commit::kzg10::Powers;
+
 use super::{
     proof::LookUpProof,
     table::{LookUpTable, PreProcessedTable},
 };
 use crate::{multiset::MultiSet, transcript::TranscriptProtocol};
-use algebra::{bls12_381::Fr, Bls12_381};
-use poly_commit::kzg10::Powers;
 
 pub struct LookUp<T: LookUpTable> {
     table: T,
@@ -70,7 +71,7 @@ mod test {
     #[test]
     fn test_proof() {
         // Setup SRS
-        let (proving_key, verifier_key) = kzg10::trusted_setup(2usize.pow(12), b"insecure_seed");
+        let (proving_key, verifier_key) = kzg10::trusted_setup(2usize.pow(12));
 
         // Setup Lookup with a 4 bit table
         let table = XOR4Bit::new();

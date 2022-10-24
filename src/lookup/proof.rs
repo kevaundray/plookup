@@ -1,11 +1,13 @@
+use ark_bls12_381::Bls12_381;
+use ark_poly_commit::kzg10::{Powers, VerifierKey};
+
 use super::table::PreProcessedTable;
 use crate::{
     kzg10,
     multiset::{EqualityProof, MultiSet},
     transcript::TranscriptProtocol,
 };
-use algebra::Bls12_381;
-use poly_commit::kzg10::{Powers, VerifierKey};
+
 pub struct LookUpProof {
     pub multiset_equality_proof: EqualityProof,
 }

@@ -1,7 +1,10 @@
 use crate::{kzg10, multiset::MultiSet};
-use algebra::{bls12_381::Fr, Bls12_381};
-use ff_fft::{DensePolynomial as Polynomial, EvaluationDomain};
-use poly_commit::kzg10::{Commitment, Powers};
+use ark_bls12_381::{Bls12_381, Fr};
+use ark_poly::{
+    polynomial::univariate::DensePolynomial as Polynomial, EvaluationDomain,
+    Radix2EvaluationDomain, UVPolynomial,
+};
+use ark_poly_commit::kzg10::{Commitment, Powers};
 use std::collections::HashMap;
 
 pub mod four_bits;
@@ -69,7 +72,7 @@ pub trait LookUpTable {
         assert_eq!(t_2.len(), k);
         assert_eq!(t_3.len(), k);
 
-        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(n).unwrap();
+        let domain: Radix2EvaluationDomain<Fr> = EvaluationDomain::new(n).unwrap();
 
         // Pad
         let pad_by = n - t_1.len();
